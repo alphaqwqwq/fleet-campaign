@@ -1,7 +1,7 @@
 # EXEC-001-04：正式入口发布与旧项目清理
 
 - Plan：[PLAN-001：程序与发布自动化基础](../../04-plans/PLAN-001-ROOM-PERSISTENCE-FOUNDATION.md)
-- 状态：In Progress
+- 状态：Merged
 - 分支：`feature/exec-001-04-public-entry-release`
 - 依赖：[EXEC-001-02：CI/CD 诊断与部署反馈基线](EXEC-001-02-RELEASE-DIAGNOSTICS.md)、[EXEC-001-03：本机 Alidns 与 Vercel CNAME 自动化](EXEC-001-03-DNS-VERCEL-AUTOMATION.md)
 - 影响域：Git/CI 发布闭环 / 正式主页入口 / 外部旧项目清理
@@ -80,5 +80,5 @@
 - alphaqwq-home 生产验收：www.alphaqwq.xyz 主 bundle 更新为 `index-Qng80zV8.js`（200）；浏览器验收通过——标题 `alphaqwq · 工具集`，卡片含"舰队战役"（url `https://fleet.alphaqwq.xyz`），fleet-room.vercel.app 卡片已移除，点击跳转 `https://fleet.alphaqwq.xyz` 成功（标题 Fleet Campaign，200），控制台无错误，站点自身资源全部 200（旧 bundle `index-jLvPPwF0.js` 已删除返回 404，为旧部署残留清理）。
 - 正式入口多网络验收（2026-08-07）：用户确认已完成——本机、独立浏览器及移动网络均可访问 `https://fleet.alphaqwq.xyz`，并可从 `https://www.alphaqwq.xyz/` 通过点击相应卡片访问 OW Coach（coach.alphaqwq.xyz）、随机分队器（tb.alphaqwq.xyz）与舰队战役（fleet.alphaqwq.xyz）三个入口。
 - 旧 fleet-room 目标清单与用户最终确认（2026-08-07）：用户核对后确认删除。目标清单：GitHub 仓库 `alphaqwqwq/fleet-room`（PUBLIC、TypeScript、2026-08-06 创建、未归档、仅 `main` 分支、0 open issues/PRs、0 releases）；Vercel 项目 `fleet-room`（`prj_VoLIEtJJbXXBVUG4MPxNI1cJlqO6`，绑定同一仓库、productionBranch=main、域名 `fleet-room.vercel.app`、0 环境变量、2 个 production 部署、框架 vite）。
-- 旧 fleet-room 删除与写后查询：Vercel 项目已删除（2026-08-07，DELETE `/v9/projects/prj_VoLIEtJJbXXBVUG4MPxNI1cJlqO6` 返回 204；写后查询 API 返回 404 `Project not found`，`fleet-room.vercel.app` 站点实测不可达 HTTP 000）。GitHub 仓库删除需 `delete_repo` scope（当前 GitHub token 无此权限），用户选择在 GitHub 网页自行删除；删除完成后写后验证 `gh repo view` 返回仓库不存在。删除不可逆、不适用 `git revert`、平台不保证恢复，删除前的用户确认是唯一准入；已确认无独立环境变量/日志需求（0 env、无 releases、无 open issues/PRs）。
-- 回滚、阻塞与遗留风险：fleet-campaign 与 alphaqwq-home 的已合并 Git 变更可按 `git revert` 回滚（fleet-campaign 合并提交 `926b4b5`/`c2a6de6`/`cbd038a`，alphaqwq-home 合并提交 `9fcad7b`）；DNS 按 EXEC-001-03 流程回滚。旧 fleet-room GitHub 仓库删除待用户网页操作完成后写后验证，属外部不可逆清理，无自动回滚。Vercel `alphaqwq-home` 项目已重连 Git 并设 productionBranch=main（经用户授权），后续主页 main 推送会自动触发生产部署。
+- 旧 fleet-room 删除与写后查询：Vercel 项目已删除（2026-08-07，DELETE `/v9/projects/prj_VoLIEtJJbXXBVUG4MPxNI1cJlqO6` 返回 204；写后查询 API 返回 404 `Project not found`，`fleet-room.vercel.app` 站点实测不可达 HTTP 000）。GitHub 仓库删除需 `delete_repo` scope（当前 GitHub token 无此权限），由用户在 GitHub 网页删除 `alphaqwqwq/fleet-room`；写后验证：`gh repo view` 返回 `Could not resolve to a Repository`，REST API `GET /repos/alphaqwqwq/fleet-room` 返回 404 `Not Found`，确认仓库已不存在。删除不可逆、不适用 `git revert`、平台不保证恢复，删除前的用户确认是唯一准入；已确认无独立环境变量/日志需求（0 env、无 releases、无 open issues/PRs）。
+- 回滚、阻塞与遗留风险：fleet-campaign 与 alphaqwq-home 的已合并 Git 变更可按 `git revert` 回滚（fleet-campaign 合并提交 `926b4b5`/`c2a6de6`/`cbd038a`/`dd04c48`，alphaqwq-home 合并提交 `9fcad7b`）；DNS 按 EXEC-001-03 流程回滚。旧 fleet-room GitHub 仓库与 Vercel 项目均已删除并经写后验证（见上），属外部不可逆清理，无自动回滚。Vercel `alphaqwq-home` 项目已重连 Git 并设 productionBranch=main（经用户授权），后续主页 main 推送会自动触发生产部署。无未决阻塞。
