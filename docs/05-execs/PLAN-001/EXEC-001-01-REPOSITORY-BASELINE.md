@@ -1,10 +1,10 @@
 # EXEC-001-01：正式仓库与工程基线
 
-- Plan：[PLAN-001：临时房主房间与可恢复战役基础](../../04-plans/PLAN-001-ROOM-PERSISTENCE-FOUNDATION.md)
-- 状态：In Progress
+- Plan：[PLAN-001：程序与发布自动化基础](../../04-plans/PLAN-001-ROOM-PERSISTENCE-FOUNDATION.md)
+- 状态：Pushed
 - 分支：`feature/exec-001-01-repository-baseline`
 - 依赖：无
-- 影响域：工程 / CI / 部署 / 文档
+- 影响域：工程 / CI / 发布基础 / 文档
 
 ## 本次交付
 
@@ -28,12 +28,11 @@
 
 ## 结果记录
 
-- 实际仓库：待填写
+- 实际仓库：https://github.com/alphaqwqwq/fleet-campaign
 - 实际分支：`feature/exec-001-01-repository-baseline`
-- 实际提交：待填写
-- GitHub Actions：待填写
-- Vercel 生产 URL：待填写
+- 实际提交：`28999aad27a3b63502c561cf4a9c783424348406`（首次 `main` 初始化）与 `24cbb3a183b233c2bcf86bf8e60f4a6179f78f2c`（feature 分支 Vercel 配置）。
+- GitHub Actions：https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31139907539（main，成功）；https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31140647074（feature，成功）。PR：https://github.com/alphaqwqwq/fleet-campaign/pull/1（Open，CI 与 Vercel 检查成功，未合并）。
+- Vercel 生产 URL：https://fleet-campaign.vercel.app；部署详情：https://vercel.com/alphaqwqwq114514/fleet-campaign/5vX3QyUNrWcHA3WuYnuUUCRa4aKA。Vercel 构建与部署状态为 Ready，但当前执行环境与人工访问均无法连接默认域名，网页可访问性未验证。
 - 依赖决策：ESLint 用于根级静态检查；Vitest 用于执行一个真实断言；其余依赖为 React、Vite 和 TypeScript 的工程所需依赖。
-- 验证结果：待填写
-- 已知限制：空 workspace 包只建立边界；不含 PeerJS、IndexedDB、游戏规则或真实 LLM。
-
+- 验证结果：已实际通过 `npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（1 个测试）和 `npm run build`。GitHub Actions 在 main 与 feature 分支成功。Vercel 使用 `npm ci` 与 `npm run build` 成功构建并标记 Ready。默认生产域名访问失败，未验证网页可访问性。
+- 已知限制：空 workspace 包只建立边界；不含 PeerJS、IndexedDB、游戏规则或真实 LLM。首次空远端使用已验证的基线提交初始化 main，随后 feature 分支的 Vercel 配置通过 PR 等待合并。默认 `*.vercel.app` 域名当前无法从人工与执行环境访问；自定义域名、阿里云 DNS、发布可访问性策略和主页入口迁移不属于本 Exec，需在新 Plan 或 ADR 裁决。
