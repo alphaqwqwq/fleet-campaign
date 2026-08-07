@@ -64,7 +64,14 @@
 
 ## 结果记录
 
-- fleet-campaign 分支、提交、PR、Actions、Preview：待执行。
+- 分支创建前状态确认（2026-08-07）：原工作树位于 `feature/exec-001-01-repository-baseline`，存在不属于 EXEC-001-04 明确列举的已修改与未跟踪文档（EXEC-001-02 文档、PLAN-001/WORKFLOW/EXEC-001-01 更新、RELEASE-CICD-PLAYBOOK.md、EXECUTION-AGENT.md 等）。用户确认：之前未闭合的 Exec 实际工作均已完成（主要是网页自动化 CICD），本 Exec 分支将全部未提交 docs+scripts 一并提交，无异议。
+- fleet-campaign 分支：从 `origin/main`（`28999aa`）创建 `feature/exec-001-04-public-entry-release`；纳入 EXEC-001-03 允许文件（`scripts/Invoke-VercelFleetCnameDns.ps1`、EXEC-001-03 文档与短提示词、提示词索引）、本 Exec 文档与短提示词、PLAN-001 发布自动化文档体系更新及根配置 `vercel.json`。`.gitignore` 仅存在末尾空行差异，已恢复为 main 版本，不纳入提交。
+- 本地门禁（2026-08-07）：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（1 个测试通过）、`npm run build` 全部通过；`npm ci` 提示 `esbuild@0.28.1` 待审批安装脚本，不影响命令成功，未执行任何审批或配置写入。
+- 提交：`92c71eb9d0fd0ef8fd59c076c8c50e4c6ad2f2f8`（docs(exec-001-04): release public entry foundation and carry exec-001-03 verified content）。
+- PR：[#2](https://github.com/alphaqwqwq/fleet-campaign/pull/2)（Open，base main，head `feature/exec-001-04-public-entry-release`，MERGEABLE）。
+- GitHub Actions：[verify run 31188538136](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31188538136) 对提交 `92c71eb` 执行五项门禁成功（conclusion=success）。
+- Vercel Preview：[部署 2ArJk7xwfJ8LpWJrTMvpSu95VT2j](https://vercel.com/alphaqwqwq114514/fleet-campaign/2ArJk7xwfJ8LpWJrTMvpSu95VT2j) 状态 Ready（pass），Preview URL `https://fleet-campaign-git-feature-exec-001-04-d8517d-alphaqwqwq114514.vercel.app`；提交关联 `92c71eb`，构建 `npm ci` + `npm run build`，产物 `apps/web/dist`。
+- Preview 浏览器验收：执行环境访问 Preview 域名 `*.vercel.app` TCP 443 超时（curl 20s 超时），与 EXEC-001-02 已记录的默认 `*.vercel.app` 网络路径基线一致；不推断成功，正式入口验收以自定义域名 `https://fleet.alphaqwq.xyz` 为准。
 - main 合并提交、Actions 与 Vercel Production：待执行。
 - 正式入口多网络验收：待执行。
 - alphaqwq-home 入口文件、分支、提交、PR、部署与验收：待执行。
