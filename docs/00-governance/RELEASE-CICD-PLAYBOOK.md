@@ -38,6 +38,8 @@ npm run build
 6. **多网络验收矩阵**（见下节）。
 7. **合并 `main` → 生产部署**：只允许已通过门禁与验收的提交；记录生产部署状态与 URL；`main` 保持可构建、可部署、可回滚。
 8. **多人在线验证**：每次大阶段投放后，组织多人/多网络实际访问，收集页面、控制台、网络与证书反馈，写入 Exec。
+9. **主页入口更新（独立发布 Exec）**：主页仓库（`alphaqwq-home`）的按钮/链接更新必须走其自己的 feature 分支、PR 与部署；合并到其 `main` 后必须复验生产域名实际内容，不能只依赖 PR 检查通过。
+10. **旧项目清理**：正式入口与主页入口全部验收通过后，由用户最终确认目标清单（GitHub 仓库 + Vercel 项目 + 域名 + 部署/环境变量/日志影响）后直接删除；删除前必须写后查询确认资源不存在，记录不可逆风险，不得声称可 `git revert` 恢复。
 
 ## 多网络验收矩阵
 
@@ -60,6 +62,11 @@ npm run build
 - **DNS 写入必须幂等 + 可回滚**：dry-run → 用户审核 → `-Apply` → 写后验证；回滚用同一 `RecordId` 以 `-Apply -Target <旧值>` 更新回旧值；删除记录必须回 Plan 裁决，脚本不删除。
 - **凭据轮换**：AccessKey 一旦进入对话/日志即视为泄露，必须停用并重建，再用专用 RAM 用户（非主账号）重新配置 CLI；最小权限只授 `alidns:DescribeDomainRecords`、`AddDomainRecord`、`UpdateDomainRecord`。
 - **网络间歇性超时**：调用 `alidns.aliyuncs.com` 偶发 DNS 解析超时，重试可恢复；不要因一次超时重复写 DNS。
+- **Vercel CLI 网络失败先查 `NODE_OPTIONS=--use-system-ca`**（EXEC-001-04 实测）：Windows 上未设置该环境变量时，Vercel CLI/API 会持续报 `TypeError: fetch failed`（whoami/ls/inspect/domains 全失败），设置后立即恢复；这是本项目环境的既有配置项，新对话执行 Vercer 命令前必须先设置。
+- **合并 PR 后生产未更新，先核对 Vercel Production Branch**（EXEC-001-04 实测）：Vercel 项目默认 Production Branch 跟随 GitHub 默认分支（可能为 `master`），而实际开发与合并可能在 `main`；此时 main 推送只产生 Preview（别名 `*-git-main-*`），生产域名内容不变。合并后必须用生产域名实际内容（资源哈希/页面 DOM）复验，不能只信 PR 检查。
+- **Vercel Update Project API 不接受 `link` 字段**（EXEC-001-04 实测）：`PATCH /v9/projects/{id}` 请求体 schema 不含 `link`（经 Vercel SDK 类型定义与实测确认，报 `should NOT have additional property link`），`PATCH /v9/projects/{id}/link` 为 404，CLI 亦无生产分支修改命令。修改 productionBranch 需通过 Vercel 控制台 UI（Settings → Git），或经用户授权用 `POST /v9/projects/{id}/link`（body `{type, repo, productionBranch}`）**断开并重连** Git 集成（会重置部分集成状态）；重连后需推送一次空提交触发生产部署。
+- **Vercel token 位置（Windows）**：`%APPDATA%\xdg.data\com.vercel.cli\auth.json`（`token` 字段）；Vercer API 调用用 Bearer 注入，token 不写入仓库/文档。
+- **旧项目删除的权限边界**：Vercel 项目删除用项目 token（DELETE `/v9/projects/{id}`，204 成功，之后 API 查询 404 确认）；GitHub 仓库删除需 `delete_repo` scope（`gh auth refresh -h github.com -s delete_repo` 或用户网页操作），当前 GitHub token 无此 scope 时必须由用户完成。
 
 ## 回滚与止损
 
