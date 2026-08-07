@@ -72,8 +72,9 @@
 - GitHub Actions：[verify run 31188538136](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31188538136) 对提交 `92c71eb` 执行五项门禁成功（conclusion=success）。
 - Vercel Preview：[部署 2ArJk7xwfJ8LpWJrTMvpSu95VT2j](https://vercel.com/alphaqwqwq114514/fleet-campaign/2ArJk7xwfJ8LpWJrTMvpSu95VT2j) 状态 Ready（pass），Preview URL `https://fleet-campaign-git-feature-exec-001-04-d8517d-alphaqwqwq114514.vercel.app`；提交关联 `92c71eb`，构建 `npm ci` + `npm run build`，产物 `apps/web/dist`。
 - Preview 浏览器验收：执行环境访问 Preview 域名 `*.vercel.app` TCP 443 超时（curl 20s 超时），与 EXEC-001-02 已记录的默认 `*.vercel.app` 网络路径基线一致；不推断成功，正式入口验收以自定义域名 `https://fleet.alphaqwq.xyz` 为准。
-- main 合并提交、Actions 与 Vercel Production：待执行。
-- 正式入口多网络验收：待执行。
+- main 合并：PR #2 合并至 main，合并提交 `926b4b5b2f4626f6e9a69f54054c2c804a5c4be5`（Merge pull request #2 from alphaqwqwq/feature/exec-001-04-public-entry-release）；main 分支 GitHub Actions [run 31188799017](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31188799017) 对 `926b4b5` 五项门禁成功；main 提交的 Vercel 检查（Preview Comments）为 success。Vercel Production 部署为 `https://fleet.alphaqwq.xyz`（自定义域名已由 EXEC-001-03 映射至 Vercel 项目）；执行环境 Vercel CLI/API 网络间歇性不可达（与 EXEC-001-02/03 记录一致），Production 部署状态以正式入口实测为准。
+- 正式入口复验（执行环境，2026-08-07）：`curl -I https://fleet.alphaqwq.xyz` 返回 `HTTP/1.1 200 OK`（Server: Vercel、Content-Type: text/html; charset=utf-8、Strict-Transport-Security: max-age=63072000、X-Vercel-Cache: HIT）。TLS 证书：`Subject: CN=fleet.alphaqwq.xyz`、`Issuer: CN=YR1, O=Let's Encrypt, C=US`、有效期 2026-08-07 至 2026-11-05，SslStream AuthenticateAsClient（默认信任校验）成功。浏览器验收（独立浏览器环境）：HTTP 200、标题 `Fleet Campaign`、DOM 正常（站点标识 FLEET CAMPAIGN、h1 `房间基础工程准备中`、占位说明文本）、控制台无错误/警告、无 4xx/5xx 网络请求、截图成功（`fleet-acceptance.png`）。观察项：页面加载 `/@vite/client`，为 Vite 开发态痕迹，当前部署物为 EXEC-001-01 基线占位页，非故障，不属本 Exec 修改范围。
+- 正式入口多网络验收（用户本机/独立浏览器/移动网络）：待用户确认（EXEC-001-03 已记录此前多环境通过）。
 - alphaqwq-home 入口文件、分支、提交、PR、部署与验收：待执行。
 - 旧 fleet-room GitHub/Vercel 目标清单与用户最终确认：待执行。
 - 旧 fleet-room 删除与写后查询：待执行。
