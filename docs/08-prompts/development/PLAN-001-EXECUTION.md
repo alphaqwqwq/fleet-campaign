@@ -1,3 +1,7 @@
-# PLAN-001 执行对话提示词
+# PLAN-001 执行对话短提示词
 
-本提示词委派 PLAN-001 的单一 Exec；不得提前实现 PeerJS 联机、IndexedDB、游戏规则或真实 LLM。正式项目必须位于新的独立 Git 目录与新的公开 GitHub 仓库中，并使用 feature 分支、PR、CI 与 Vercel `main` 生产部署流程。
+```text
+FLEETCAMPAIGN｜EXEC｜P001 仓库与工程基线｜01
+角色：EXEC。只处理并更新：D:\workspace\deckgame\fleet-campaign\docs\05-execs\PLAN-001\EXEC-001-01-REPOSITORY-BASELINE.md。
+先阅读该文档列出的必读材料和本工作流；遵守文档内硬约束，不执行其范围外操作。
+```
