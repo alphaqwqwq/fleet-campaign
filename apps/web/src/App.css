@@ -1,0 +1,33 @@
+.page {
+  align-items: center;
+  background: radial-gradient(circle at top, #1e353b, #0e1518 62%);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.status-card {
+  border: 1px solid #5d8c8d;
+  max-width: 42rem;
+  padding: clamp(2rem, 6vw, 4rem);
+}
+
+.eyebrow {
+  color: #9ecfbd;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+h1 {
+  font-size: clamp(2rem, 6vw, 4rem);
+  margin: 0.5rem 0 1rem;
+}
+
+.status-card p:last-child {
+  color: #c5d1d1;
+  line-height: 1.7;
+  margin-bottom: 0;
+}
+
