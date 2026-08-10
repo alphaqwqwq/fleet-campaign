@@ -61,7 +61,7 @@
 ## 结果记录
 
 - 实际分支：`feature/exec-002-01-domain-protocol-foundation`（基于 `origin/main` f1cef48 创建）。
-- 提交 / PR / CI / Preview：提交与 PR 建立后进行记录；Preview 以 PR 提供的 Vercel 预览为准（本 Exec 不改变发布入口，正式入口验收不属于本 Exec）。
+- 提交 / PR / CI / Preview：提交 `36ddc4dd08aebcba2db15b353fc1a28367bcd8d9`（已推送 `origin/feature/exec-002-01-domain-protocol-foundation`）；PR [#7](https://github.com/alphaqwqwq/fleet-campaign/pull/7)；CI verify [SUCCESS](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31385170677/job/93443867885)；Preview [fleet-campaign-git-feature-exec-002-01-38ecfa-alphaqwqwq114514.vercel.app](https://fleet-campaign-git-feature-exec-002-01-38ecfa-alphaqwqwq114514.vercel.app)。本 Exec 不改变发布入口，正式入口验收不属于本 Exec。
 - 固定门禁：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（6 文件 66 用例）、`npm run build` 全部通过（本地 2026-08-10 验证，CI 证据待 PR 记录）。
 - 人工验收：`packages/domain` 仅依赖 `@fleet-campaign/content`，不导入 UI、浏览器、网络、存储或 LLM；全部公开示例、fixture 与事件名称仅使用 `demo-v1` 抽象内容；协议不含令牌值或伤害/胜负等客户端结论字段，领域层不反向导入 `protocol`。
 - 遗留风险与对父 Plan 验收的影响：会话账本与协议信封的无副作用数据结构已就绪，但其宿主组合（房主应用服务）属于 `apps/web`，由 EXEC-002-03/04 接线；协议 v1 对外字段、随机消费点、状态机、不变量或跨包依赖的任何未裁决变化需按 PLAN-002-01 触发 Review/ADR 并停止本阶段。
