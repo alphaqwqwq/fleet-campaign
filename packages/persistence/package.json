@@ -1,6 +1,16 @@
 {
   "name": "@fleet-campaign/persistence",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fleet-campaign/protocol": "0.0.0"
+  }
 }
 
