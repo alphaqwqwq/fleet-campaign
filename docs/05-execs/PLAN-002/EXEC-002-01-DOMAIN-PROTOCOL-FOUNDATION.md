@@ -75,3 +75,11 @@
 - 测试：先改/新增失败测试（短键、单字符键、非法长度边界；publicPayload 未知字段/缺字段/非法值/room-closed 空载荷；game 与 unit 未知字段、未知 unit id），再最小实现。`packages/protocol/src/validate.test.ts` 由 35 增至 46 用例。
 - 固定门禁（2026-08-11 本地）：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（6 文件 79 用例）、`npm run build` 全部通过；提交、PR CI 与 Vercel Check 见本文件上方 Git/PR 记录。
 - 遗留风险：仍待 EXEC-002-03/04 宿主组合产生真实广播事件与快照后，以端到端证据复核公开载荷与 `projectGame` 映射；`room-closed` 公开载荷定为空对象，若未来需要携带展示字段须先经 Plan/ADR 裁决。
+
+## Terra 补救结果（REVIEW-002-01 +02）
+
+- 升级缘由：独立复审 `REVIEW|E002-01+02` 仍为 `remediation required`，指出首次 Flash 补救将 16 字节无填充 base64url 的精确表示错误实现为 22-32 字符范围，因而错误接受 23、24、31、32 字符键及 32 字符测试样例。Plan 批准的格式是精确 22 个 URL-safe 字符。
+- 会话恢复：OpenChamber fork 标题 API 异常未能可靠保留预期 fork 标题，故由内置 Terra 在原 EXEC、同一分支和同一 PR #10 上完成一次受限补救；不改变已关闭的 `validate.ts` 公开 schema finding、协议 v1 字段、事件类型或幂等重放语义。
+- 测试与修复：先增加 23、24、31、32 字符的拒绝断言，定向测试如预期以 5 项失败暴露旧 22-32 实现；`ids.ts` 随后最小收紧为 `value.length === 22`。首次与 `npm ci` 并发的定向测试出现 `ERR_MODULE_NOT_FOUND`，原因是依赖目录重建竞争，非代码失败；`npm ci` 完成后串行复验发现共享合法 `KEY` fixture 实际为 23 字符，已最小修正为 22 字符并保留全部新增拒绝边界。
+- 验证（2026-08-11 本地）：串行执行 `npm ci`、`npx vitest run packages/protocol/src/validate.test.ts`（1 文件 50 用例）、`npm run typecheck`、`npm run lint`、`npm run test`（6 文件 83 用例）、`npm run build`，全部通过。无新增运行时依赖。
+- 风险与后续：精确长度校验只能验证表示长度与字符集，不能证明客户端随机源的密码学质量；生成方仍须按 Plan 使用本地加密安全随机 16 字节值并在同次用户操作重试中复用。PR #10 不合并，交回独立 Review 和 Master。

@@ -18,7 +18,7 @@ const ROOM_ID = 'r_abcdEFGHij12'
 const CLIENT_ID = 'u_12345678-1234-1234-1234-123456789abc'
 const CAMPAIGN_ID = 'c_12345678-1234-1234-1234-123456789abc'
 const MESSAGE_ID = 'm_001'
-const KEY = 'qK8_xM3-vN5_pZ1-wT9_yA6'
+const KEY = 'qK8_xM3-vN5_pZ1-wT9_yA'
 
 function startedGame() {
   const initial = createInitialState(DEMO_V1_CONTENT)
@@ -110,6 +110,10 @@ describe('validateCommandIntent', () => {
     ['empty', ''],
     ['single character', 'a'],
     ['too short for 128-bit', 'a'.repeat(21)],
+    ['23 characters', 'a'.repeat(23)],
+    ['24 characters', 'a'.repeat(24)],
+    ['31 characters', 'a'.repeat(31)],
+    ['32 characters', 'a'.repeat(32)],
     ['too long', 'a'.repeat(33)],
     ['unsafe characters', 'abc def'],
   ])('rejects an idempotencyKey that is %s', (_label, key) => {
@@ -389,15 +393,18 @@ describe('validateCommandResult', () => {
 })
 
 describe('isValidIdempotencyKey', () => {
-  it('accepts url-safe 128-bit keys of 22-32 chars', () => {
+  it('accepts an exact 22-character url-safe 128-bit key', () => {
     expect(isValidIdempotencyKey('a'.repeat(22))).toBe(true)
-    expect(isValidIdempotencyKey('A_-09z'.repeat(5).slice(0, 32))).toBe(true)
   })
 
-  it('rejects empty, too short, oversized and unsafe keys', () => {
+  it('rejects empty, non-22-character and unsafe keys', () => {
     expect(isValidIdempotencyKey('')).toBe(false)
     expect(isValidIdempotencyKey('a')).toBe(false)
     expect(isValidIdempotencyKey('a'.repeat(21))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(23))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(24))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(31))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(32))).toBe(false)
     expect(isValidIdempotencyKey('a'.repeat(33))).toBe(false)
     expect(isValidIdempotencyKey('has space')).toBe(false)
     expect(isValidIdempotencyKey(42)).toBe(false)
