@@ -61,5 +61,5 @@
 - Remediation 实现：导入先精确校验 envelope，同时保留 raw save；从 raw 读取整数 `schemaVersion` 后调用 `migrateSave(fromVersion, raw)`，迁移返回值始终再次通过 `decodeCampaignSave`，全部校验成功后才执行唯一一次 `store.save`。localStorage load/list 同时校验 key 中 campaign ID 与 payload `campaignId`；不一致的 load/export 返回 `save_invalid`，list 隔离记录，原始数据不被自动改写或删除，delete 只删除请求 key。
 - 测试补充：旧版本 raw save 确实进入迁移器；损坏、负数版本不调用迁移器，仅结构完整的未来整数版本返回 unsupported；迁移器返回非法额外字段、RNG 或领域状态时均零写入且现有存档不变。新增 awaiting-player、active、completed、closed 可达状态正例与非初始 awaiting-player、active 零完整度、非法 completed/closed 等反例；key/payload 不一致覆盖 load/list/export/delete，并断言隔离及原始数据保留。
 - 本轮固定门禁：`npx vitest run packages/persistence/src/persistence.test.ts` 通过（1 文件、46 用例）；`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（7 文件、129 用例）与 `npm run build` 均通过；`git diff --check` 通过（仅有既有 Windows CRLF 转换提示）。
-- 自动 Review / 人工验收：本轮针对 PR #11 正式独立 Review 指定的一项 High 与两项 Medium findings 完成补救，状态仍为 `Pushed`，等待独立复审 `pass`；用户人工验收仍聚合到父 Plan Gate。
+- 自动 Review / 人工验收：本轮针对 PR #11 正式独立 Review 指定的一项 High 与两项 Medium findings 完成补救；[REVIEW-002-02](../../06-reviews/PLAN-002/REVIEW-002-02-LOCAL-CAMPAIGN-PERSISTENCE.md) 复审最终结论为 `pass`。状态仍为 `Pushed`，等待 PR 合并；用户人工验收仍聚合到父 Plan Gate。
 - 遗留风险与对父 Plan 验收的影响：浏览器真实 localStorage 配额、隐私模式兼容性和导入导出体验须在后续网页/Plan Gate 中验证；本 Exec 的自动化门禁使用注入式内存 Storage，不覆盖真实多浏览器交互。

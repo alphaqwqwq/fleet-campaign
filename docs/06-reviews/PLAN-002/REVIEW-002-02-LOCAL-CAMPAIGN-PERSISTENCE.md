@@ -1,6 +1,6 @@
 # REVIEW-002-02：本地战役档持久化独立代码审查
 
-- 状态：Remediation Required
+- 状态：Pass
 - 审查目标：[EXEC-002-02：本地战役档持久化](../../05-execs/PLAN-002/EXEC-002-02-LOCAL-CAMPAIGN-PERSISTENCE.md)
 - 父 Plan：[PLAN-002-01：游戏骨架与最小可玩电子化循环](../../04-plans/PLAN-002-01-GAME-SKELETON-MVP-LOOP.md)
 - PR：[PR #11](https://github.com/alphaqwqwq/fleet-campaign/pull/11)
@@ -71,3 +71,14 @@
 ## 后续责任
 
 原 EXEC-002-02 实现会话应在同一 PR 分支修复上述 findings、补齐未弱化测试并重跑固定门禁；随后必须再次获得独立 Review `pass`。本 Review 只新增和提交该审查记录，不修改实现、不合并 PR，也不代表父 Plan 用户人工验收完成。
+
+## 补救复审
+
+- 复审基线：PR #11 head `06e97b6`，base `origin/main` `9839b24`。补救提交 `264cc47`、结果记录 `e64c5fb` 与最终补充提交 `06e97b6` 已逐项核对；changed-files 仍限于 `packages/persistence/**`、目标 Exec/Review 记录和既有允许文件，未改变存档 v1、协议 v1 或领域契约。
+- High 已关闭：`import()` 对迁移器返回值调用 `decodeCampaignSave` 后才执行唯一 `store.save`。迁移器返回未知字段、非法 RNG 或非法领域状态的测试均断言零写入且现有档不变；迁移器抛错同样不覆盖。
+- Medium 已关闭：持久化校验新增批准 reducer 可达组合约束与各 phase 正反矩阵。`awaiting-player` 仅接受 round 0 且双方完整；`active` 要求 round 至少 1 且双方大于 0；`completed` 要求有效赢家、败方为 0、胜方大于 0；`closed` 不允许伪造赢家。原复现的 awaiting-player round 99 与 active 零完整度均被拒绝。
+- Medium 已关闭：缺失、`null`、字符串、负数与非整数 `schemaVersion` 返回 `save_invalid` 且不调用迁移器/不写入；结构完整的未来整数版本由默认 v1 迁移入口返回 `save_unsupported_version`。默认迁移器仍只读取 v1，测试注入旧版迁移器只验证未来显式迁移链的写前再校验边界。
+- 附加核对：localStorage load/list 校验 key 与 payload 的 `campaignId` 一致；不一致或损坏记录被拒绝/隔离但不自动删除，delete 只删除请求 key。
+- 本轮命令：首次 `npm ci` 因 Windows `ENOTEMPTY` 无法删除被占用的 eslint 目录；等待 5 秒后单次重试成功，0 vulnerabilities。随后定向测试通过（1 文件 46 用例），`npm run typecheck`、`npm run lint`、`npm run test`（7 文件 129 用例）与 `npm run build` 全部通过。
+- 外部证据：head `06e97b6` 的 GitHub Actions `verify` [run 31467334622](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31467334622)、Vercel 与 Preview Comments 均为 success；PR 仍为 Open、未合并。
+- 最终结论：`pass`。三项 finding 均已关闭，允许合并 PR #11。该结论只放行 EXEC-002-02 代码与记录，不表示父 Plan 用户人工验收完成。
