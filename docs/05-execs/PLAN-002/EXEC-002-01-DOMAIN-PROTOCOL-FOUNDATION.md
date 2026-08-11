@@ -46,11 +46,11 @@
 6. 编写表驱动测试，覆盖初始状态、开始、轮换、胜负、每个拒绝码、不可变性、幂等重放、协议非法输入和 RNG 重现。
 7. 运行 `npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`、`npm run build`；所有命令成功后再提交、推送、创建 PR 与记录 Preview。
 
-## 人工验收
+## 自动 Review
 
-- 审查 `packages/domain` 不导入 UI、浏览器、网络、存储或 LLM。
-- 审查所有公开示例、fixture 和事件名称只使用 `demo-v1` 抽象内容。
-- 审查协议不含令牌值、伤害/胜负等客户端结论字段，领域层不反向导入 `protocol`。
+- 独立审查目标为 [REVIEW-002-01](../../06-reviews/PLAN-002/REVIEW-002-01-DOMAIN-PROTOCOL-FOUNDATION.md)，由 `fleet-review`/Terra 核对 `packages/domain` 不导入 UI、浏览器、网络、存储或 LLM，领域层不反向导入 `protocol`。
+- Review 核对所有公开示例、fixture 和事件名称只使用 `demo-v1` 抽象内容，协议不含令牌值或客户端提交的伤害/胜负结论字段，并复核固定门禁、PR #7、CI 和合并证据。
+- 本 Exec 不要求用户审查底层代码；用户人工验收聚合到父 Plan Gate。实现会话的静态自查不能替代独立 Review `pass`。
 
 ## 回滚与止损
 
@@ -63,5 +63,5 @@
 - 实际分支：`feature/exec-002-01-domain-protocol-foundation`（基于 `origin/main` f1cef48 创建）。
 - 提交 / PR / CI / Preview：实现提交 `36ddc4d`、结果记录提交 `8b957f9`（已推送该 feature 分支）；PR [#7](https://github.com/alphaqwqwq/fleet-campaign/pull/7) 于 2026-08-10 合并，合并提交 `bb86363f9f9b9aab2982b4fc727852db2408e98b`；CI verify [SUCCESS](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31385170677/job/93443867885)；Preview [fleet-campaign-git-feature-exec-002-01-38ecfa-alphaqwqwq114514.vercel.app](https://fleet-campaign-git-feature-exec-002-01-38ecfa-alphaqwqwq114514.vercel.app)。本 Exec 不改变发布入口，正式入口验收不属于本 Exec。
 - 固定门禁：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（6 文件 66 用例）、`npm run build` 全部通过，本地 2026-08-10 与 PR CI verify 双验证。
-- 人工验收：`packages/domain` 仅依赖 `@fleet-campaign/content`，不导入 UI、浏览器、网络、存储或 LLM；全部公开示例、fixture 与事件名称仅使用 `demo-v1` 抽象内容；协议不含令牌值或伤害/胜负等客户端结论字段，领域层不反向导入 `protocol`。
+- 实现会话静态自查（非用户人工验收、非独立 Review）：记录称 `packages/domain` 仅依赖 `@fleet-campaign/content`，公开示例使用 `demo-v1` 抽象内容，协议不含令牌值或客户端结论字段；该结论须由 REVIEW-002-01 以代码和 Git/CI 证据独立校正。
 - 遗留风险与对父 Plan 验收的影响：会话账本与协议信封的无副作用数据结构已就绪，但其宿主组合（房主应用服务）属于 `apps/web`，由 EXEC-002-03/04 接线；协议 v1 对外字段、随机消费点、状态机、不变量或跨包依赖的任何未裁决变化需按 PLAN-002-01 触发 Review/ADR 并停止本阶段。
