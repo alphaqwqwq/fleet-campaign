@@ -91,7 +91,8 @@ export function createCampaignPersistence(
         typeof envelope.save !== 'object' ||
         envelope.save === null ||
         Array.isArray(envelope.save) ||
-        !Number.isInteger((envelope.save as Record<string, unknown>).schemaVersion)
+        !Number.isInteger((envelope.save as Record<string, unknown>).schemaVersion) ||
+        ((envelope.save as Record<string, unknown>).schemaVersion as number) < 0
       ) {
         throw new SaveError('save_invalid', 'Campaign save schema version must be an integer')
       }

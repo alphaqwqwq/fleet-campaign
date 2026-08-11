@@ -164,7 +164,7 @@ describe('campaign persistence', () => {
     expect(store.saves.get(CAMPAIGN_ID)).toEqual(original)
   })
 
-  it.each([undefined, null, '1', 1.5])('rejects non-integer schemaVersion %s before migration', async (schemaVersion) => {
+  it.each([undefined, null, '1', -1, 1.5])('rejects invalid schemaVersion %s before migration', async (schemaVersion) => {
     const store = new MemoryStore()
     let migrations = 0
     const persistence = createCampaignPersistence(store, {
@@ -176,6 +176,12 @@ describe('campaign persistence', () => {
 
     await expectCode(persistence.import(exported({ schemaVersion })), 'save_invalid')
     expect(migrations).toBe(0)
+    expect(store.writes).toBe(0)
+  })
+
+  it('classifies a structurally complete future integer version as unsupported without writing', async () => {
+    const store = new MemoryStore()
+    await expectCode(createCampaignPersistence(store).import(exported({ ...fixture(), schemaVersion: 2 })), 'save_unsupported_version')
     expect(store.writes).toBe(0)
   })
 
@@ -226,6 +232,30 @@ describe('campaign persistence', () => {
     expect(() => decodeCampaignSave(fixture({ rngState: { seed: RNG_SEED, index: 1 } }))).toThrowError(
       expect.objectContaining({ code: 'save_invalid' }),
     )
+  })
+
+  it.each([
+    ['awaiting-player', fixture({ gameSnapshot: { ...fixture().gameSnapshot, phase: 'awaiting-player', round: 0, activeSeat: null, actionPoints: 0 } })],
+    ['active', fixture()],
+    ['completed', fixture({ gameSnapshot: { ...fixture().gameSnapshot, phase: 'completed', round: 3, activeSeat: null, actionPoints: 0, units: [{ id: 'host-unit', integrity: 1 }, { id: 'guest-unit', integrity: 0 }], winnerSeat: 'host' } })],
+    ['closed', fixture({ gameSnapshot: { ...fixture().gameSnapshot, phase: 'closed', activeSeat: null, actionPoints: 0 } })],
+  ] as const)('accepts reachable %s phase snapshots', (_phase, save) => {
+    expect(decodeCampaignSave(save)).toEqual(save)
+  })
+
+  it.each([
+    ['awaiting-player nonzero round', { phase: 'awaiting-player', round: 1, activeSeat: null, actionPoints: 0 }],
+    ['awaiting-player damaged unit', { phase: 'awaiting-player', round: 0, activeSeat: null, actionPoints: 0, units: [{ id: 'host-unit', integrity: 2 }, { id: 'guest-unit', integrity: 3 }] }],
+    ['active zero round', { phase: 'active', round: 0, activeSeat: 'host', actionPoints: 1 }],
+    ['active defeated unit', { phase: 'active', round: 2, activeSeat: 'guest', actionPoints: 1, units: [{ id: 'host-unit', integrity: 0 }, { id: 'guest-unit', integrity: 2 }] }],
+    ['completed zero round', { phase: 'completed', round: 0, activeSeat: null, actionPoints: 0, units: [{ id: 'host-unit', integrity: 1 }, { id: 'guest-unit', integrity: 0 }], winnerSeat: 'host' }],
+    ['completed defeated winner', { phase: 'completed', round: 3, activeSeat: null, actionPoints: 0, units: [{ id: 'host-unit', integrity: 0 }, { id: 'guest-unit', integrity: 0 }], winnerSeat: 'host' }],
+    ['closed winner', { phase: 'closed', activeSeat: null, actionPoints: 0, winnerSeat: 'host' }],
+  ] as const)('rejects unreachable %s snapshots', (_scenario, gameOverrides) => {
+    expect(() => decodeCampaignSave({
+      ...fixture(),
+      gameSnapshot: { ...fixture().gameSnapshot, ...gameOverrides },
+    })).toThrowError(expect.objectContaining({ code: 'save_invalid' }))
   })
 
   it('exposes an explicit v1 migration boundary and rejects unsupported migration', () => {

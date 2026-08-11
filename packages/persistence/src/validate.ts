@@ -72,17 +72,32 @@ function validateGameView(value: unknown): value is GameView {
   if (unitIds.size !== 2) return false
 
   const phase = value.phase as (typeof PHASES)[number]
+  const hostIntegrity = value.units.find((unit) => isRecord(unit) && unit.id === 'host-unit')?.integrity
+  const guestIntegrity = value.units.find((unit) => isRecord(unit) && unit.id === 'guest-unit')?.integrity
+  if (typeof hostIntegrity !== 'number' || typeof guestIntegrity !== 'number') return false
+
+  if (phase === 'awaiting-player') {
+    if (value.round !== 0 || hostIntegrity !== 3 || guestIntegrity !== 3) return false
+  }
   if (phase === 'active') {
-    if (!isSeat(value.activeSeat) || value.actionPoints !== 1 || value.winnerSeat !== null) return false
+    if (
+      value.round < 1 ||
+      hostIntegrity === 0 ||
+      guestIntegrity === 0 ||
+      !isSeat(value.activeSeat) ||
+      value.actionPoints !== 1 ||
+      value.winnerSeat !== null
+    ) return false
   } else if (value.activeSeat !== null || value.actionPoints !== 0) {
     return false
   }
 
   if (phase === 'completed') {
-    if (!isSeat(value.winnerSeat)) return false
+    if (value.round < 1 || !isSeat(value.winnerSeat)) return false
     const defeatedId = value.winnerSeat === 'host' ? 'guest-unit' : 'host-unit'
+    const winnerIntegrity = value.winnerSeat === 'host' ? hostIntegrity : guestIntegrity
     const defeated = value.units.find((unit) => isRecord(unit) && unit.id === defeatedId)
-    if (!defeated || defeated.integrity !== 0) return false
+    if (!defeated || defeated.integrity !== 0 || winnerIntegrity === 0) return false
   } else if (value.winnerSeat !== null) {
     return false
   }
@@ -91,6 +106,9 @@ function validateGameView(value: unknown): value is GameView {
 }
 
 function assertSupportedSaveVersion(value: UnknownRecord): void {
+  if (!Number.isInteger(value.schemaVersion) || (value.schemaVersion as number) < 0) {
+    throw new SaveError('save_invalid', 'Campaign save schema version must be a non-negative integer')
+  }
   if (value.schemaVersion !== CAMPAIGN_SCHEMA_VERSION) {
     throw new SaveError('save_unsupported_version', 'Campaign save schema version is unsupported')
   }
@@ -98,8 +116,8 @@ function assertSupportedSaveVersion(value: UnknownRecord): void {
 
 export function decodeCampaignSave(value: unknown): CampaignSave {
   if (!isRecord(value)) throw new SaveError('save_invalid', 'Campaign save must be an object')
-  assertSupportedSaveVersion(value)
   if (!hasExactKeys(value, SAVE_KEYS)) throw new SaveError('save_invalid', 'Campaign save fields are invalid')
+  assertSupportedSaveVersion(value)
   if (!isValidCampaignId(value.campaignId)) throw new SaveError('save_invalid', 'campaignId is invalid')
   if (value.contentId !== 'demo-v1') {
     throw new SaveError('save_incompatible_content', 'Campaign content is incompatible')
