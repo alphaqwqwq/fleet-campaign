@@ -33,3 +33,4 @@
 ## 第三轮 Finding 与补救
 
 - 最终复审发现 `fleet-master` 仍允许会写入 refs/FETCH_HEAD 的 `git fetch*`。现已移除，并将常见 Git 写白名单纳入 `verify:governance` 回归检查；所有角色 Agent 只保留 Git/PR/CI 只读查询。
+- 聚焦核验要求补齐 `reset/restore/clean` 回归检测；治理门禁现覆盖 Agent 已禁止的常见 Git 写命令全集。
