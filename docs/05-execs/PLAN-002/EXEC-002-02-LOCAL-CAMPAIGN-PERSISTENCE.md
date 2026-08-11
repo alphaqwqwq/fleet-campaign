@@ -57,8 +57,9 @@
 
 ## 结果记录
 
-- 实际分支：`feature/exec-002-02-local-campaign-persistence`，隔离 worktree 基于 `origin/main` `9839b24` 创建。实现版本化 `CampaignSave` / `FleetCampaignSave` v1、精确运行时 schema、显式迁移入口、持久化服务与可注入的浏览器 localStorage store；未改变存档 v1、协议 v1 或领域契约。
-- 提交 / PR / CI / Preview：初始实现提交 `441fe0c`（`feat(persistence): add local campaign saves`）和合同修复提交 `aae9bff`（`fix(persistence): enforce local save boundaries`）已推送；PR [#11](https://github.com/alphaqwqwq/fleet-campaign/pull/11) 指向 `main`。最终 head `182da5a` 的 GitHub Actions `verify` [run 31466168445](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31466168445)、Vercel Preview 和 Vercel Preview Comments 均通过。未合并 PR。
-- 固定门禁与存档测试：`npx vitest run packages/persistence/src/persistence.test.ts` 通过（1 文件、23 用例）；`npm run typecheck` 通过；`npm run lint` 通过；`npm run test` 通过（7 文件、106 用例）；`npm run build` 通过。审查确认保存和导入使用精确字段 schema，禁止字段拒绝且不导出；导入在唯一写入前完成 UTF-8 大小、JSON、格式、版本、内容、领域投影、RNG 与迁移校验；损坏、未知版本、迁移异常和不兼容内容均不覆盖现有档；localStorage 列表隔离损坏/未知版本记录且不自动删除；包只依赖 `@fleet-campaign/protocol` 的公开入口。
-- 自动 Review / 人工验收：[REVIEW-002-02](../../06-reviews/PLAN-002/REVIEW-002-02-LOCAL-CAMPAIGN-PERSISTENCE.md) 首轮仅发现生命周期误标 `Completed`；本提交已按工作流校正为真实 `Pushed`，等待同一 Review 复审 `pass`。用户人工验收仍聚合到父 Plan Gate。
+- 实际分支：`feature/exec-002-02-local-campaign-persistence`，PR [#11](https://github.com/alphaqwqwq/fleet-campaign/pull/11) 保持 Open、未合并。本轮 remediation 仅修改 `packages/persistence/**` 与本 Exec 结果记录，未改变存档 v1、协议 v1 或领域契约。
+- Remediation 实现：导入先精确校验 envelope，同时保留 raw save；从 raw 读取整数 `schemaVersion` 后调用 `migrateSave(fromVersion, raw)`，迁移返回值始终再次通过 `decodeCampaignSave`，全部校验成功后才执行唯一一次 `store.save`。localStorage load/list 同时校验 key 中 campaign ID 与 payload `campaignId`；不一致的 load/export 返回 `save_invalid`，list 隔离记录，原始数据不被自动改写或删除，delete 只删除请求 key。
+- 测试补充：旧版本 raw save 确实进入迁移器；非整数版本不调用迁移器；迁移器返回非法额外字段、RNG 或领域状态时均零写入且现有存档不变；key/payload 不一致覆盖 load/list/export/delete，并断言隔离及原始数据保留。
+- 本轮固定门禁：`npx vitest run packages/persistence/src/persistence.test.ts` 通过（1 文件、33 用例）；`npm run typecheck` 通过；`npm run lint` 通过；`npm run test` 通过（7 文件、116 用例）；`npm run build` 通过；`git diff --check` 通过（仅有既有 Windows CRLF 转换提示）。
+- 自动 Review / 人工验收：本轮针对 PR #11 独立 review 指定的两项 findings 完成补救，状态仍为 `Pushed`，等待独立复审 `pass`；用户人工验收仍聚合到父 Plan Gate。
 - 遗留风险与对父 Plan 验收的影响：浏览器真实 localStorage 配额、隐私模式兼容性和导入导出体验须在后续网页/Plan Gate 中验证；本 Exec 的自动化门禁使用注入式内存 Storage，不覆盖真实多浏览器交互。

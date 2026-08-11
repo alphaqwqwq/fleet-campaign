@@ -7,7 +7,6 @@ import {
   SAVE_FORMAT_VERSION,
   SaveError,
   type CampaignSave,
-  type FleetCampaignSave,
 } from './types'
 
 type UnknownRecord = Record<string, unknown>
@@ -139,7 +138,11 @@ export function decodeCampaignSave(value: unknown): CampaignSave {
   return structuredClone(value) as unknown as CampaignSave
 }
 
-export function decodeFleetCampaignSave(value: unknown): FleetCampaignSave {
+export function decodeFleetCampaignSave(value: unknown): {
+  format: typeof SAVE_FORMAT
+  formatVersion: typeof SAVE_FORMAT_VERSION
+  save: unknown
+} {
   if (!isRecord(value) || !hasExactKeys(value, ['format', 'formatVersion', 'save'])) {
     throw new SaveError('save_invalid', 'Export package fields are invalid')
   }
@@ -147,5 +150,5 @@ export function decodeFleetCampaignSave(value: unknown): FleetCampaignSave {
   if (value.formatVersion !== SAVE_FORMAT_VERSION) {
     throw new SaveError('save_unsupported_version', 'Export package version is unsupported')
   }
-  return { format: SAVE_FORMAT, formatVersion: SAVE_FORMAT_VERSION, save: decodeCampaignSave(value.save) }
+  return { format: SAVE_FORMAT, formatVersion: SAVE_FORMAT_VERSION, save: value.save }
 }

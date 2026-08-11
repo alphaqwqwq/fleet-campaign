@@ -87,9 +87,18 @@ export function createCampaignPersistence(
 
       // Validation completes before the only storage write, so failed imports cannot overwrite a save.
       const envelope = decodeFleetCampaignSave(parsed)
+      if (
+        typeof envelope.save !== 'object' ||
+        envelope.save === null ||
+        Array.isArray(envelope.save) ||
+        !Number.isInteger((envelope.save as Record<string, unknown>).schemaVersion)
+      ) {
+        throw new SaveError('save_invalid', 'Campaign save schema version must be an integer')
+      }
+      const fromVersion = (envelope.save as Record<string, unknown>).schemaVersion as number
       let migrated: CampaignSave
       try {
-        migrated = migrate(envelope.save.schemaVersion, envelope.save)
+        migrated = decodeCampaignSave(migrate(fromVersion, envelope.save))
       } catch (error) {
         throw error instanceof SaveError
           ? error

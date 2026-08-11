@@ -33,8 +33,13 @@ export class LocalStorageCampaignStore implements CampaignSaveStore {
     const serialized = this.#storage.getItem(this.#key(campaignId))
     if (serialized === null) return null
     try {
-      return JSON.parse(serialized) as CampaignSave
+      const save = decodeCampaignSave(JSON.parse(serialized) as unknown)
+      if (save.campaignId !== campaignId) {
+        throw new SaveError('save_invalid', 'Stored campaign does not match its storage key')
+      }
+      return save
     } catch (error) {
+      if (error instanceof SaveError) throw error
       throw new SaveError('save_invalid', 'Stored campaign is not valid JSON', { cause: error })
     }
   }
@@ -47,7 +52,9 @@ export class LocalStorageCampaignStore implements CampaignSaveStore {
       const serialized = this.#storage.getItem(key)
       if (serialized === null) continue
       try {
-        saves.push(decodeCampaignSave(JSON.parse(serialized) as unknown))
+        const save = decodeCampaignSave(JSON.parse(serialized) as unknown)
+        if (save.campaignId !== key.slice(this.#keyPrefix.length)) continue
+        saves.push(save)
       } catch {
         // Corrupt and unsupported records remain stored but are isolated from valid listings.
       }

@@ -131,6 +131,54 @@ describe('campaign persistence', () => {
     expect(store.saves.get(CAMPAIGN_ID)).toEqual(original)
   })
 
+  it('passes an older raw save to the migrator before decoding it', async () => {
+    const store = new MemoryStore()
+    const raw = { schemaVersion: 0, legacy: true }
+    let received: { fromVersion: number; raw: unknown } | undefined
+    const persistence = createCampaignPersistence(store, {
+      migrateSave: (fromVersion, migrationRaw) => {
+        received = { fromVersion, raw: migrationRaw }
+        return fixture()
+      },
+    })
+
+    expect(await persistence.import(exported(raw))).toEqual(fixture())
+    expect(received).toEqual({ fromVersion: 0, raw })
+    expect(store.writes).toBe(1)
+  })
+
+  it.each([
+    ['unknown field', { ...fixture(), unexpected: true }],
+    ['invalid RNG', { ...fixture(), rngState: { seed: 'short', index: 0 } }],
+    ['invalid domain state', { ...fixture(), gameSnapshot: { ...fixture().gameSnapshot, actionPoints: 0 } }],
+  ])('rejects migrator output with %s without writing', async (_scenario, migrated) => {
+    const store = new MemoryStore()
+    const original = fixture()
+    store.saves.set(CAMPAIGN_ID, structuredClone(original))
+    const persistence = createCampaignPersistence(store, {
+      migrateSave: () => migrated as CampaignSave,
+    })
+
+    await expectCode(persistence.import(exported({ schemaVersion: 0, legacy: true })), 'save_invalid')
+    expect(store.writes).toBe(0)
+    expect(store.saves.get(CAMPAIGN_ID)).toEqual(original)
+  })
+
+  it.each([undefined, null, '1', 1.5])('rejects non-integer schemaVersion %s before migration', async (schemaVersion) => {
+    const store = new MemoryStore()
+    let migrations = 0
+    const persistence = createCampaignPersistence(store, {
+      migrateSave: () => {
+        migrations += 1
+        return fixture()
+      },
+    })
+
+    await expectCode(persistence.import(exported({ schemaVersion })), 'save_invalid')
+    expect(migrations).toBe(0)
+    expect(store.writes).toBe(0)
+  })
+
   it.each([
     ['unknown package version', { formatVersion: 2 }, 'save_unsupported_version'],
     ['unknown save version', {}, 'save_unsupported_version'],
@@ -232,7 +280,7 @@ describe('localStorage campaign store', () => {
     await store.save(save)
     expect(await store.load(CAMPAIGN_ID)).toEqual(save)
     expect(await store.list()).toEqual([save])
-    await store.delete(CAMPAIGN_ID)
+    await createCampaignPersistence(store).delete(CAMPAIGN_ID)
     expect(await store.load(CAMPAIGN_ID)).toBeNull()
   })
 
@@ -255,5 +303,37 @@ describe('localStorage campaign store', () => {
 
     await expectCode(createCampaignPersistence(store).load(CAMPAIGN_ID), 'save_invalid')
     expect(storage.getItem(`fleet-campaign:save:${CAMPAIGN_ID}`)).toBe('{')
+  })
+
+  it('rejects load and export when the storage key does not match the payload without deleting it', async () => {
+    const storage = new MemoryStorage()
+    const store = new LocalStorageCampaignStore({ storage })
+    const mismatched = fixture({ campaignId: 'c_223e4567-e89b-42d3-a456-426614174000' })
+    const key = `fleet-campaign:save:${CAMPAIGN_ID}`
+    const serialized = JSON.stringify(mismatched)
+    storage.setItem(key, serialized)
+    const persistence = createCampaignPersistence(store)
+
+    await expectCode(persistence.load(CAMPAIGN_ID), 'save_invalid')
+    await expectCode(persistence.export(CAMPAIGN_ID), 'save_invalid')
+    expect(storage.getItem(key)).toBe(serialized)
+  })
+
+  it('isolates key/payload mismatches from lists and deletes only the requested key', async () => {
+    const storage = new MemoryStorage()
+    const store = new LocalStorageCampaignStore({ storage })
+    const otherId = 'c_223e4567-e89b-42d3-a456-426614174000'
+    const mismatchedKey = `fleet-campaign:save:${CAMPAIGN_ID}`
+    const otherKey = `fleet-campaign:save:${otherId}`
+    const serialized = JSON.stringify(fixture({ campaignId: otherId }))
+    storage.setItem(mismatchedKey, serialized)
+    storage.setItem(otherKey, serialized)
+
+    expect(await createCampaignPersistence(store).list()).toEqual([fixture({ campaignId: otherId })])
+    expect(storage.getItem(mismatchedKey)).toBe(serialized)
+
+    await store.delete(CAMPAIGN_ID)
+    expect(storage.getItem(mismatchedKey)).toBeNull()
+    expect(storage.getItem(otherKey)).toBe(serialized)
   })
 })
