@@ -1,6 +1,17 @@
 {
   "name": "@fleet-campaign/realtime",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fleet-campaign/domain": "0.0.0",
+    "@fleet-campaign/protocol": "0.0.0",
+    "peerjs": "^1.5.5"
+  }
 }
-
