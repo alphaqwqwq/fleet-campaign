@@ -57,7 +57,7 @@
 
 ## 结果记录
 
-- 实际分支：`feature/exec-002-02-local-campaign-persistence`，PR [#11](https://github.com/alphaqwqwq/fleet-campaign/pull/11) 保持 Open、未合并。本轮 remediation 仅修改 `packages/persistence/**` 与本 Exec 结果记录，未改变存档 v1、协议 v1 或领域契约。
+- 实际分支：`feature/exec-002-02-local-campaign-persistence`，remediation 实现提交 `264cc47`（`fix(persistence): validate migrated and keyed saves`）已完成；PR [#11](https://github.com/alphaqwqwq/fleet-campaign/pull/11) 保持 Open、未合并。本轮仅修改 `packages/persistence/**` 与本 Exec 结果记录，未改变存档 v1、协议 v1 或领域契约。
 - Remediation 实现：导入先精确校验 envelope，同时保留 raw save；从 raw 读取整数 `schemaVersion` 后调用 `migrateSave(fromVersion, raw)`，迁移返回值始终再次通过 `decodeCampaignSave`，全部校验成功后才执行唯一一次 `store.save`。localStorage load/list 同时校验 key 中 campaign ID 与 payload `campaignId`；不一致的 load/export 返回 `save_invalid`，list 隔离记录，原始数据不被自动改写或删除，delete 只删除请求 key。
 - 测试补充：旧版本 raw save 确实进入迁移器；非整数版本不调用迁移器；迁移器返回非法额外字段、RNG 或领域状态时均零写入且现有存档不变；key/payload 不一致覆盖 load/list/export/delete，并断言隔离及原始数据保留。
 - 本轮固定门禁：`npx vitest run packages/persistence/src/persistence.test.ts` 通过（1 文件、33 用例）；`npm run typecheck` 通过；`npm run lint` 通过；`npm run test` 通过（7 文件、116 用例）；`npm run build` 通过；`git diff --check` 通过（仅有既有 Windows CRLF 转换提示）。
