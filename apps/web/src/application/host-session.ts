@@ -69,6 +69,7 @@ export class HostSessionController {
 
   private receive(connectionId: string, frame: ClientToHostFrame): void {
     if (frame.frame === 'join-request') { this.join(connectionId, frame); return }
+    if (frame.frame === 'leave-request') { this.leave(connectionId, frame); return }
     const valid = validateCommandIntent(frame.intent)
     if (!valid.ok) { this.sendResult(connectionId, this.reject(this.safeIdempotencyKey(frame.intent?.idempotencyKey), frame.clientId, 'protocol_invalid')); return }
     if (frame.roomId !== this.roomId || valid.value.roomId !== this.roomId) {
@@ -84,6 +85,18 @@ export class HostSessionController {
     const result = this.handleIntent(binding, valid.value)
     this.sendResult(connectionId, result)
     if (!result.accepted && result.errorCode === 'state_conflict') this.sendSnapshot(connectionId, binding)
+  }
+
+  private leave(connectionId: string, frame: Extract<ClientToHostFrame, { frame: 'leave-request' }>): void {
+    const binding = this.bindings.get(frame.clientId)
+    if (
+      frame.roomId !== this.roomId
+      || !binding
+      || binding.connectionId !== connectionId
+      || binding.tokenFingerprint !== sessionTokenFingerprint(frame.token)
+    ) return
+    this.bindings.delete(frame.clientId)
+    this.options.hostTransport.closeClient(connectionId)
   }
 
   private safeIdempotencyKey(value: unknown): string {
@@ -108,6 +121,7 @@ export class HostSessionController {
       this.sendSnapshot(connectionId, old)
       return
     }
+    if (frame.token !== undefined) { this.sendJoinRejected(connectionId, frame.clientId, 'identity_invalid'); return }
     if (frame.requestedRole === 'player' && [...this.bindings.values()].some((b) => b.role === 'player')) { this.sendJoinRejected(connectionId, frame.clientId, 'player_seat_unavailable'); return }
     const role: Role = frame.requestedRole
     const token = generateSessionToken()

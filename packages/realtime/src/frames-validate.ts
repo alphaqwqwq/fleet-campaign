@@ -38,8 +38,8 @@ export function validateInboundFrame(input: unknown): Validation<ClientToHostFra
   if (!isRecord(input)) return { ok: false, errors: ['frame must be an object'] }
 
   const frame = input.frame
-  if (frame !== 'join-request' && frame !== 'command-intent') {
-    return { ok: false, errors: ['frame must be join-request or command-intent'] }
+  if (frame !== 'join-request' && frame !== 'command-intent' && frame !== 'leave-request') {
+    return { ok: false, errors: ['frame must be join-request, command-intent, or leave-request'] }
   }
   if (input.protocolVersion !== PROTOCOL_VERSION) {
     errors.push('protocolVersion must be 1')
@@ -62,13 +62,18 @@ export function validateInboundFrame(input: unknown): Validation<ClientToHostFra
     if (input.token !== undefined && !isValidSessionToken(input.token)) {
       errors.push('token must be a valid session token when present')
     }
-  } else {
+  } else if (frame === 'command-intent') {
     rejectUnknownKeys(input, ['frame', 'protocolVersion', 'messageId', 'roomId', 'clientId', 'token', 'intent'], errors)
     if (!isValidSessionToken(input.token)) {
       errors.push('token must be a valid session token')
     }
     if (!isRecord(input.intent)) {
       errors.push('intent must be an object')
+    }
+  } else {
+    rejectUnknownKeys(input, ['frame', 'protocolVersion', 'messageId', 'roomId', 'clientId', 'token'], errors)
+    if (!isValidSessionToken(input.token)) {
+      errors.push('token must be a valid session token')
     }
   }
 

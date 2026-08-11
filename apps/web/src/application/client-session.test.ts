@@ -137,4 +137,19 @@ describe('createClientSession', () => {
     expect(controller.view.snapshot?.game.phase).toBe('active')
     expect(controller.view.snapshot?.eventSequence).toBe(1)
   })
+
+  it('revokes the token on explicit leave while preserving disconnect reconnect', () => {
+    const itx = integration()
+    const clientId = generateClientId()
+    let token = ''
+    const first = itx.dial(clientId, undefined, (value) => { token = value })
+    first.controller.connect(itx.roomId, 'player')
+    expect(first.controller.view.status).toBe('connected')
+
+    first.controller.close()
+    const stale = itx.dial(clientId, token)
+    stale.controller.connect(itx.roomId, 'player')
+    expect(stale.controller.view.status).toBe('closed')
+    expect(stale.controller.view.lastError?.code).toBe('identity_invalid')
+  })
 })

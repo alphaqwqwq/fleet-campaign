@@ -1,4 +1,3 @@
-import type { SeatId } from '@fleet-campaign/domain'
 import type {
   BroadcastEvent,
   CommandIntent,
@@ -7,6 +6,8 @@ import type {
   RosterRole,
   Snapshot,
 } from '@fleet-campaign/protocol'
+
+type PublicSeat = Snapshot['roster'][number]['seat']
 
 export const REQUESTED_ROLES = ['player', 'spectator'] as const
 
@@ -53,6 +54,16 @@ export interface CommandIntentFrame {
   intent: CommandIntent
 }
 
+/** 客户端上行：显式离开并撤销当前连接绑定的会话令牌。 */
+export interface LeaveRequestFrame {
+  frame: 'leave-request'
+  protocolVersion: ProtocolVersion
+  messageId: string
+  roomId: string
+  clientId: string
+  token: string
+}
+
 /** 房主下行：加入接受。`token` 只在握手下发，随后由客户端在受保护消息中携带。 */
 export interface JoinAcceptedFrame {
   frame: 'join-accepted'
@@ -62,7 +73,7 @@ export interface JoinAcceptedFrame {
   clientId: string
   token: string
   role: RosterRole
-  seat: SeatId | null
+  seat: PublicSeat | null
 }
 
 /** 房主下行：加入拒绝（传输级错误码）。 */
@@ -122,7 +133,7 @@ export interface DuplicateConnectionFrame {
   clientId: string
 }
 
-export type ClientToHostFrame = JoinRequestFrame | CommandIntentFrame
+export type ClientToHostFrame = JoinRequestFrame | CommandIntentFrame | LeaveRequestFrame
 
 export type HostToClientFrame =
   | JoinAcceptedFrame
@@ -136,5 +147,5 @@ export type HostToClientFrame =
 export type WireFrame = ClientToHostFrame | HostToClientFrame
 
 export function isClientToHostFrame(frame: WireFrame): frame is ClientToHostFrame {
-  return frame.frame === 'join-request' || frame.frame === 'command-intent'
+  return frame.frame === 'join-request' || frame.frame === 'command-intent' || frame.frame === 'leave-request'
 }

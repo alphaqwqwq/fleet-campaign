@@ -1,10 +1,10 @@
 # EXEC-002-03：房主权威实时会话
 
 - Plan：[PLAN-002-01：游戏骨架与最小可玩电子化循环](../../04-plans/PLAN-002-01-GAME-SKELETON-MVP-LOOP.md)
-- 状态：Pushed / remediation required
-- 下一动作：关闭 REVIEW-002-03 的两个 P1 与一个 P2 finding，串行重跑固定门禁并更新 PR #13。
-- 证据：PR #13 head `c787a95`；verify、Vercel、Preview Comments 成功；独立 Review 不放行。
-- 基线：`origin/main` `eb0e499` → PR #13 `c787a95`；Review 固定 head `f0509cd`。
+- 状态：Verified / awaiting independent re-review
+- 下一动作：Master 提交并推送补救，等待 PR #13 checks 后冻结新 head 独立复审。
+- 证据：显式 leave 撤销、realtime→domain 解耦与终局双事件断言已完成；定向 58 项、全量 187 项及全部固定门禁通过。
+- 基线：已合入 `origin/main` `69e4fe6` 的 Workflow V2；补救前 PR #13 head `c787a95`，首轮 Review 固定 head `f0509cd`。
 - 分支：`feature/exec-002-03-host-authoritative-realtime`
 - 依赖：EXEC-002-01 已 Merged
 - 影响域：临时房间 / 最小会话令牌 / PeerJS-WebRTC 适配 / 同步与降级
@@ -74,3 +74,9 @@
 - 自动化与人工联机验收：真实浏览器、公共信令建连与主观联机体验未在本环境执行，按 Plan 汇入父 Plan Gate；无网络替身与本地门禁成功不替代真实结论。
 - 遗留风险与对父 Plan 验收的影响：`sessionTokenFingerprint` 为确定性非加密摘要，作用仅为避免房主内存保留明文令牌，令牌熵为 256-bit 使预像不可行；未来若需密码学 verifier 应改 SHA-256。浏览器会话存储保留令牌与 `clientId` 的恢复接线、真实 PeerJS 建连与公共信令可达性留待 EXEC-002-04/05。观战者出现在公开 roster 中席位记为 `guest`（v1 schema 仅允许 host/guest 席位），语义待网页验收确认。
 - Review 补救状态：REVIEW-002-03 要求显式 leave 撤销 token、移除 realtime→domain 依赖，并补终局双事件广播断言；以上证据均早于补救，修复后必须重跑固定门禁。当前不满足合并或 EXEC-002-04 准入。
+- Review 补救结果（2026-08-11）：
+  1. 新增外层 `leave-request` 帧及严格校验；客户端显式关闭时发送受保护 leave，房主仅在 `roomId + clientId + connectionId + token` 全部匹配后删除 binding 并关闭连接。纯传输断线仍保留 binding，旧 token 可合法重连；显式 leave 后旧 token 得到 `identity_invalid`。
+  2. realtime 的 seat 类型改由 protocol Snapshot 公开投影派生，删除源码与 package manifest/lockfile 中 realtime 对 domain 的直接依赖；未移动 reducer、事件生成或规则结算。
+  3. 终局测试断言玩家和观战者均按 sequence 6/7 收到 `action-confirmed`、`demo-completed`，result 只带首事件，最终 snapshot 为 `completed` 且 winner 为 host。
+- 补救验证：`npm install --package-lock-only`、`npm ci`、`npm run verify:governance`、定向 Vitest 5 文件 58 项、typecheck、lint、全量 Vitest 12 文件 187 项、build、`git diff --check` 均通过。
+- 会话证据：`EXEC|E002-03+03+实时会话Review补救` 因当前 OpenChamber 未重载已合并 Agent 配置且 build 会话无 Assistant/Git 产出，由普通 Master 依据 Workflow V2 接管；该执行器故障不计作 Flash 失败，未创建 Terra 会话。

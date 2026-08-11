@@ -109,6 +109,16 @@ export class ClientSessionController {
   }
 
   close(): void {
+    if (this.token && this.roomId && this.view.status === 'connected') {
+      this.options.clientTransport.send({
+        frame: 'leave-request',
+        protocolVersion: 1,
+        messageId: this.messageId(),
+        roomId: this.roomId,
+        clientId: this.options.clientId,
+        token: this.token,
+      })
+    }
     this.options.clientTransport.close()
     this.token = null
     this.view.status = 'closed'

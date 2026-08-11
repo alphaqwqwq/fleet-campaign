@@ -262,6 +262,40 @@ describe('createHostSession', () => {
     expect(latest.game.units.find((u) => u.id === 'host-unit')?.integrity).toBe(2)
   })
 
+  it('broadcasts both terminal events in order with the final completed snapshot', () => {
+    const h = harness()
+    const player = h.join(generateClientId(), 'player')
+    const spectator = h.join(generateClientId(), 'spectator')
+    const accepted = h.acceptedFor(player)
+    h.controller.hostSubmit('start-demo')
+    h.controller.hostSubmit('advance')
+    h.sendIntent(player, { token: accepted.token, command: 'advance', idempotencyKey: 't'.repeat(22), expectedEventSequence: 2 })
+    h.controller.hostSubmit('advance')
+    h.sendIntent(player, { token: accepted.token, command: 'advance', idempotencyKey: 'u'.repeat(22), expectedEventSequence: 4 })
+
+    const playerBefore = player.frames.length
+    const spectatorBefore = spectator.frames.length
+    const result = h.controller.hostSubmit('advance')
+    expect(result.accepted).toBe(true)
+    if (!result.accepted) return
+    expect(result.event.type).toBe('action-confirmed')
+    expect(result.event.eventSequence).toBe(6)
+    expect(result.snapshot.eventSequence).toBe(7)
+    expect(result.snapshot.game.phase).toBe('completed')
+    expect(result.snapshot.game.winnerSeat).toBe('host')
+
+    for (const frames of [player.frames.slice(playerBefore), spectator.frames.slice(spectatorBefore)]) {
+      const events = frames
+        .filter((frame) => frame.frame === 'broadcast-event')
+        .map((frame) => frame.event)
+      expect(events.map((event) => event.type)).toEqual(['action-confirmed', 'demo-completed'])
+      expect(events.map((event) => event.eventSequence)).toEqual([6, 7])
+      const snapshot = frames.filter((frame): frame is SnapshotFrame => frame.frame === 'snapshot').at(-1)
+      expect(snapshot?.snapshot.game.phase).toBe('completed')
+      expect(snapshot?.snapshot.eventSequence).toBe(7)
+    }
+  })
+
   it('replays an idempotency receipt without double settling', () => {
     const h = harness()
     const player = h.join(generateClientId(), 'player')

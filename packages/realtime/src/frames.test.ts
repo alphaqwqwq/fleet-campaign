@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { CommandIntentFrame, JoinRequestFrame } from './frames'
+import type { CommandIntentFrame, JoinRequestFrame, LeaveRequestFrame } from './frames'
 import { validateInboundFrame, validateOutboundFrame } from './frames-validate'
 import { generateSessionToken } from './token'
 
@@ -41,6 +41,18 @@ function commandIntent(overrides: Partial<CommandIntentFrame> = {}): CommandInte
   }
 }
 
+function leaveRequest(overrides: Partial<LeaveRequestFrame> = {}): LeaveRequestFrame {
+  return {
+    frame: 'leave-request',
+    protocolVersion: 1,
+    messageId: 'm_leave',
+    roomId: ROOM,
+    clientId: CLIENT,
+    token: generateSessionToken(),
+    ...overrides,
+  }
+}
+
 describe('validateInboundFrame', () => {
   it('accepts a valid join-request', () => {
     const result = validateInboundFrame(joinRequest())
@@ -50,6 +62,12 @@ describe('validateInboundFrame', () => {
   it('accepts a valid command-intent frame', () => {
     const result = validateInboundFrame(commandIntent())
     expect(result.ok).toBe(true)
+  })
+
+  it('accepts a valid leave-request and rejects invalid tokens or unknown fields', () => {
+    expect(validateInboundFrame(leaveRequest()).ok).toBe(true)
+    expect(validateInboundFrame(leaveRequest({ token: 'bad-token' })).ok).toBe(false)
+    expect(validateInboundFrame({ ...leaveRequest(), reason: 'done' }).ok).toBe(false)
   })
 
   it('rejects a non-object frame', () => {
