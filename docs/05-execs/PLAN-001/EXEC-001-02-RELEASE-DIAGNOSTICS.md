@@ -47,7 +47,7 @@
 ## 真实提交反馈闭环
 
 1. 从 `main` 当前基线创建 `feature/exec-001-02-release-diagnostics`；若 PR #1 尚未合并，不得把其 feature 分支作为 main 的替代品或正式入口。
-2. 提交仅包含本 Exec 文档、对应短提示词与提示词索引的改动，推送后创建或更新该 feature 分支自己的 PR。
+2. 提交仅包含本 Exec 文档与必要的提示词索引改动，推送后创建或更新该 feature 分支自己的 PR；会话入口使用通用 Exec 模板。
 3. 确认该提交关联的 GitHub Actions 完整执行五项固定门禁；记录 Actions URL、提交哈希、各命令结果与失败日志摘要。
 4. 确认 Vercel 为同一提交产生 Preview 部署；记录部署 URL、提交关联、构建状态、构建命令和产物目录。
 5. 在可用环境打开 Preview URL，记录 HTTP 状态、页面/DOM 或截图、控制台和网络请求。若不能访问，记录失败事实和环境，不得推断成功。

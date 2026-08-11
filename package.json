@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "verify:governance": "node scripts/verify-governance.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "vitest run",

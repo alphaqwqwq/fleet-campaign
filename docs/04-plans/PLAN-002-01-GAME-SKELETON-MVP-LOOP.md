@@ -184,13 +184,13 @@
 - 每个含应用代码的 Exec 必须在 PR 合并前由独立 `fleet-review` 会话完成代码级自动 Review。Review 至少核对目标文件范围、批准契约、跨包依赖、Schema/权限边界、测试断言、固定门禁、PR/CI/Preview 证据和回滚路径，并在 `docs/06-reviews/**` 写出 findings-first 结论；`pass` 才允许 Master 推进合并或下游依赖，`remediation required`、`blocked` 或 `contract escalation required` 均不放行。
 - 用户人工验收集中到父 Plan Gate，不再作为纯领域、协议、持久化或其他可自动验证 Exec 的逐项准入条件。Exec 中原“人工验收”清单改作 Review 可执行的静态/自动浏览器核查；真实独立设备、移动网络、主观交互与产品方向由 EXEC-002-05 汇总成一次 Plan Gate 清单，用户明确验收前不得将本 Plan 标记完成。
 - 只有不可逆外部操作、凭据/权限、未裁决契约变化，或必须由真实用户环境完成且会阻塞后续工作的前置验证，才能提前请求用户；缺少用户代码审查本身不阻塞后续纯代码 Exec。
-- Exec 默认由 Flash 执行。Flash 对同一可复现问题完成一次有证据的可信修复后仍失败，或遇到 Review 失败、复杂跨包根因、止损条件或可能改变批准契约时，必须停止重复试错并向 Master 回报；Master 使用原 Exec 目标文档、`fleet-exec` Agent 和下一个会话序号 fork 给 Terra。Terra 仍受原文件范围、固定门禁和非目标约束，不能借补救扩大功能。
+- Exec 默认由 Flash 执行。Review 的局部 finding 先回原 Exec 会话完成一次有证据的可信修复；只有该修复仍失败、出现复杂跨包根因、达到止损条件或可能改变批准契约时，Master 才使用新的有界 `fleet-exec`/Terra 补救会话。权限、空消息、Goal retry、网络错误、并发污染和证据收尾不计作 Flash 失败。
 
 ### 会话恢复与调度
 
-- 未闭合 Plan、Exec 或 Review 由 Master 先查询包括归档在内的 OpenChamber 项目会话；存在标题正确且目标相同的会话时继续发送目标，不存在时才依据 `.opencode/SESSION-NAMING.md`、对应短提示词、专用 Agent 与指定模型创建。fork 也使用下一个真实序号。子会话不得调度下游会话或要求用户跨层转述结果。
+- 未闭合 Plan、Exec 或 Review 由 Master 先查询包括归档在内的 OpenChamber 项目会话；存在标题正确、未归档且目标相同的可用会话时继续，不存在时才依据 `.opencode/SESSION-NAMING.md`、通用角色模板、专用 Agent 与指定模型创建。Goal 仍为 `active` 的旧会话必须先暂停，不能并行迁移；子会话不得调度下游会话或要求用户跨层转述结果。
 - Master 读取目标文档、Git/PR/CI/部署和子会话结果后裁决依赖。Trae 历史只可作为待核对背景；本轮仓库文件名、提交信息和当前 OpenChamber 会话均未定位到可用 Trae 记录，因此不得据此补写完成事实。
-- 本轮核验到同目标已有 `PLAN|P002-01+01` 至 `+05` 会话，其中部分仍未闭合；后续 Master 应恢复可用会话或明确废弃异常会话后再创建下一序号，不得把“已有会话未结束”解释为等待用户手工推动。
+- 历史 `PLAN|P002-01+01` 至 `+05` 会话已完成治理输入或因执行器故障停止；其中两个旧 Goal 已确认 `paused + idle` 后归档，不再恢复。后续只按活动控制台创建有界子任务。
 
 ### 治理基线工作单元
 
@@ -240,10 +240,10 @@
 
 ## 验收状态与结果记录
 
-- 当前状态：Approved。用户已确认 MVP 实施边界，并批准 `demo-v1` 的确定性 `advance` 循环、初版 `protocolVersion: 1`/存档 v1、房主局部令牌模型、PeerJS/WebRTC 可替换适配器和无运行时旁白的范围裁决；已于 2026-08-08 创建后续 Exec Draft 文档与短提示词。批准不等于任何游戏、联机或存档实现已完成。
+- 当前状态：Approved。用户已确认 MVP 实施边界，并批准 `demo-v1` 的确定性 `advance` 循环、初版 `protocolVersion: 1`/存档 v1、房主局部令牌模型、PeerJS/WebRTC 可替换适配器和无运行时旁白的范围裁决；后续会话统一使用角色模板，目标契约仍由 Plan/Exec/Review 文档承载。
 - 未验证项：现有 PeerJS/WebRTC 依赖版本、公共信令可达性、浏览器 IndexedDB 实现、跨浏览器断线行为和实际网页交互尚未调查或实现，必须由批准后的相应 Exec 以真实证据验证；不得提前陈述为可用能力。
 - 后续准入：每份 Exec 必须保持 Draft，直至其依赖已经合并、允许/禁止文件范围与验证清单复核完成；不得因 Plan 已批准而跳过独立分支、固定门禁、PR、Preview、结果记录或止损条件。
-- 当前 Git/PR/CI 事实（2026-08-11 核验）：`main` 与 `origin/main` 均为 `218be25`；EXEC-002-01 的 PR [#7](https://github.com/alphaqwqwq/fleet-campaign/pull/7) 已合并为 `bb86363`，对应 CI 与 Vercel Check 成功；PLAN-002 Plan、EXEC-002-02 至 05 及相关治理材料仍位于未提交工作树，不能陈述为已进入 Git 基线。
+- 当前 Git/PR/CI 事实（2026-08-11 核验）：`origin/main` 为 `eb0e499`；EXEC-002-01 已完成协议补救并合并；EXEC-002-02 的 PR #11 已合并为 `715c9fc`，归档 PR #12 已合并为 `eb0e499`，合并后 CI 成功；EXEC-002-03 的 PR #13 head 为 `c787a95` 且 checks 成功，但独立 Review 为 `remediation required`，不得合并或推进 EXEC-002-04。
 - EXEC-002-01 结果中的“人工验收”是实现会话的静态自查记录，不是用户人工验收或独立 Review。必须由 [REVIEW-002-01](../06-reviews/PLAN-002/REVIEW-002-01-DOMAIN-PROTOCOL-FOUNDATION.md) 校正并提供代码级放行结论；该 Review 不重做实现，也不因等待用户审查底层代码而阻塞 EXEC-002-02 的代码依赖。
 - Plan 对话只将已发生、已验证的事实写入本节；设计假设、待用户决定项、失败项和未验证项必须显式标记。
 - 所有 Exec 结束后，汇总关联提交、PR、CI、测试、浏览器验收、发布与遗留风险，回报 Master 进入 Gate Review；不得自行宣布 PLAN-002 完成或开启下一 Plan。

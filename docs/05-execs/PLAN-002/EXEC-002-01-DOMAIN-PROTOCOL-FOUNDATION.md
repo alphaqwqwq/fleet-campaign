@@ -28,7 +28,7 @@
 - `packages/content/**`：`demo-v1` 抽象模板、夹具和内容校验。
 - `packages/domain/**`：`GameState`、纯 reducer、领域事件、不变量、确定性 RNG 接口。
 - `packages/protocol/**`：v1 信封、命令、事件、快照、错误码和运行时校验。
-- 上述包的测试、根 workspace 配置中仅为使这些已存在包可构建所必需的最小改动、本 Exec 文档与对应短提示词。
+- 上述包的测试、根 workspace 配置中仅为使这些已存在包可构建所必需的最小改动及本 Exec 文档；会话使用通用 Exec 模板。
 
 ## 禁止范围
 
