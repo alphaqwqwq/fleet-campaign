@@ -58,7 +58,7 @@
 ## 结果记录
 
 - 实际分支：`feature/exec-002-02-local-campaign-persistence`，隔离 worktree 基于 `origin/main` `9839b24` 创建。实现版本化 `CampaignSave` / `FleetCampaignSave` v1、精确运行时 schema、显式迁移入口、持久化服务与可注入的浏览器 localStorage store；未改变存档 v1、协议 v1 或领域契约。
-- 提交 / PR / CI / Preview：初始实现提交 `441fe0c`（`feat(persistence): add local campaign saves`）已推送；PR [#11](https://github.com/alphaqwqwq/fleet-campaign/pull/11) 指向 `main`。初始 GitHub Actions `verify` 通过（18 秒，run `31465783045`），Vercel Preview 和 Vercel Preview Comments 均通过；本轮修复提交与最新检查状态在提交后补充核验。未合并 PR。
+- 提交 / PR / CI / Preview：初始实现提交 `441fe0c`（`feat(persistence): add local campaign saves`）和合同修复提交 `aae9bff`（`fix(persistence): enforce local save boundaries`）已推送；PR [#11](https://github.com/alphaqwqwq/fleet-campaign/pull/11) 指向 `main`。最新 GitHub Actions `verify` 通过（22 秒，run `31466074934`），Vercel Preview 和 Vercel Preview Comments 均通过。未合并 PR。
 - 固定门禁与存档测试：`npx vitest run packages/persistence/src/persistence.test.ts` 通过（1 文件、23 用例）；`npm run typecheck` 通过；`npm run lint` 通过；`npm run test` 通过（7 文件、106 用例）；`npm run build` 通过。审查确认保存和导入使用精确字段 schema，禁止字段拒绝且不导出；导入在唯一写入前完成 UTF-8 大小、JSON、格式、版本、内容、领域投影、RNG 与迁移校验；损坏、未知版本、迁移异常和不兼容内容均不覆盖现有档；localStorage 列表隔离损坏/未知版本记录且不自动删除；包只依赖 `@fleet-campaign/protocol` 的公开入口。
 - 自动 Review / 人工验收：独立自动 Review 仍须依照本 Exec 的 Review 合同完成；用户人工验收仍聚合到父 Plan Gate。
 - 遗留风险与对父 Plan 验收的影响：浏览器真实 localStorage 配额、隐私模式兼容性和导入导出体验须在后续网页/Plan Gate 中验证；本 Exec 的自动化门禁使用注入式内存 Storage，不覆盖真实多浏览器交互。
