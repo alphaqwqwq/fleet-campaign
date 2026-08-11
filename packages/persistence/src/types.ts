@@ -59,3 +59,9 @@ export interface CampaignPersistence extends CampaignSaveStore {
   export(campaignId: string): Promise<string>
   import(serialized: string): Promise<CampaignSave>
 }
+
+export type CampaignSaveMigrator = (fromVersion: number, raw: unknown) => CampaignSave
+
+export interface CampaignPersistenceOptions {
+  migrateSave?: CampaignSaveMigrator
+}

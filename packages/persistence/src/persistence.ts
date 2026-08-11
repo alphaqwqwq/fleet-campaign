@@ -4,11 +4,13 @@ import {
   SAVE_FORMAT_VERSION,
   SaveError,
   type CampaignPersistence,
+  type CampaignPersistenceOptions,
   type CampaignSave,
   type CampaignSaveStore,
   type FleetCampaignSave,
 } from './types'
 import { decodeCampaignSave, decodeFleetCampaignSave } from './validate'
+import { migrateSave } from './migration'
 
 function storageFailure(message: string, cause: unknown): SaveError {
   return cause instanceof SaveError
@@ -16,7 +18,12 @@ function storageFailure(message: string, cause: unknown): SaveError {
     : new SaveError('save_storage_failed', message, { cause })
 }
 
-export function createCampaignPersistence(store: CampaignSaveStore): CampaignPersistence {
+export function createCampaignPersistence(
+  store: CampaignSaveStore,
+  options: CampaignPersistenceOptions = {},
+): CampaignPersistence {
+  const migrate = options.migrateSave ?? migrateSave
+
   return {
     async save(save): Promise<void> {
       const validated = decodeCampaignSave(save)
@@ -80,12 +87,20 @@ export function createCampaignPersistence(store: CampaignSaveStore): CampaignPer
 
       // Validation completes before the only storage write, so failed imports cannot overwrite a save.
       const envelope = decodeFleetCampaignSave(parsed)
+      let migrated: CampaignSave
       try {
-        await store.save(envelope.save)
+        migrated = migrate(envelope.save.schemaVersion, envelope.save)
+      } catch (error) {
+        throw error instanceof SaveError
+          ? error
+          : new SaveError('save_invalid', 'Campaign save migration failed', { cause: error })
+      }
+      try {
+        await store.save(migrated)
       } catch (error) {
         throw storageFailure('Could not import campaign', error)
       }
-      return structuredClone(envelope.save)
+      return structuredClone(migrated)
     },
   }
 }

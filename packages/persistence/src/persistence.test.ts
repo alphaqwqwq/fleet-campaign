@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   MAX_IMPORT_BYTES,
+  LocalStorageCampaignStore,
   SaveError,
   createCampaignPersistence,
   decodeCampaignSave,
@@ -11,7 +12,7 @@ import {
 } from './index'
 
 const CAMPAIGN_ID = 'c_123e4567-e89b-42d3-a456-426614174000'
-const RNG_SEED = 'abcdefghijklmnopqrstuv'
+const RNG_SEED = 'AAAAAAAAAAAAAAAAAAAAAA'
 
 function fixture(overrides: Partial<CampaignSave> = {}): CampaignSave {
   return {
@@ -115,6 +116,21 @@ describe('campaign persistence', () => {
     expect(store.writes).toBe(0)
   })
 
+  it('does not overwrite when migration throws', async () => {
+    const original = fixture()
+    const store = new MemoryStore()
+    store.saves.set(CAMPAIGN_ID, structuredClone(original))
+    const persistence = createCampaignPersistence(store, {
+      migrateSave: () => {
+        throw new Error('migration failed')
+      },
+    })
+
+    await expectCode(persistence.import(exported(fixture({ savedAt: '2026-08-13T00:00:00.000Z' }))), 'save_invalid')
+    expect(store.writes).toBe(0)
+    expect(store.saves.get(CAMPAIGN_ID)).toEqual(original)
+  })
+
   it.each([
     ['unknown package version', { formatVersion: 2 }, 'save_unsupported_version'],
     ['unknown save version', {}, 'save_unsupported_version'],
@@ -152,6 +168,18 @@ describe('campaign persistence', () => {
     })).toThrowError(expect.objectContaining({ code: 'save_invalid' }))
   })
 
+  it('rejects non-canonical timestamps, RNG seeds and consumed demo-v1 RNG state', () => {
+    expect(() => decodeCampaignSave(fixture({ savedAt: '2026-08-11' }))).toThrowError(
+      expect.objectContaining({ code: 'save_invalid' }),
+    )
+    expect(() => decodeCampaignSave(fixture({ rngState: { seed: 'AAAAAAAAAAAAAAAAAAAAAB', index: 0 } }))).toThrowError(
+      expect.objectContaining({ code: 'save_invalid' }),
+    )
+    expect(() => decodeCampaignSave(fixture({ rngState: { seed: RNG_SEED, index: 1 } }))).toThrowError(
+      expect.objectContaining({ code: 'save_invalid' }),
+    )
+  })
+
   it('exposes an explicit v1 migration boundary and rejects unsupported migration', () => {
     expect(migrateSave(1, fixture())).toEqual(fixture())
     expect(() => migrateSave(2, fixture())).toThrowError(
@@ -164,5 +192,68 @@ describe('campaign persistence', () => {
     store.saves.set(CAMPAIGN_ID, { ...fixture(), schemaVersion: 2 } as unknown as CampaignSave)
     await expectCode(createCampaignPersistence(store).load(CAMPAIGN_ID), 'save_unsupported_version')
     expect(store.writes).toBe(0)
+  })
+})
+
+class MemoryStorage implements Storage {
+  readonly values = new Map<string, string>()
+
+  get length(): number {
+    return this.values.size
+  }
+
+  clear(): void {
+    this.values.clear()
+  }
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null
+  }
+
+  key(index: number): string | null {
+    return [...this.values.keys()][index] ?? null
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key)
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value)
+  }
+}
+
+describe('localStorage campaign store', () => {
+  it('stores, loads, lists and deletes saves through injected browser storage', async () => {
+    const storage = new MemoryStorage()
+    const store = new LocalStorageCampaignStore({ storage })
+    const save = fixture()
+
+    await store.save(save)
+    expect(await store.load(CAMPAIGN_ID)).toEqual(save)
+    expect(await store.list()).toEqual([save])
+    await store.delete(CAMPAIGN_ID)
+    expect(await store.load(CAMPAIGN_ID)).toBeNull()
+  })
+
+  it('isolates corrupt and unsupported records without deleting them', async () => {
+    const storage = new MemoryStorage()
+    const store = new LocalStorageCampaignStore({ storage })
+    await store.save(fixture())
+    storage.setItem('fleet-campaign:save:corrupt', '{')
+    storage.setItem('fleet-campaign:save:future', JSON.stringify({ ...fixture(), schemaVersion: 2 }))
+
+    expect(await store.list()).toEqual([fixture()])
+    expect(storage.getItem('fleet-campaign:save:corrupt')).toBe('{')
+    expect(storage.getItem('fleet-campaign:save:future')).not.toBeNull()
+  })
+
+  it('reports a corrupt requested record as invalid without deleting it', async () => {
+    const storage = new MemoryStorage()
+    const store = new LocalStorageCampaignStore({ storage })
+    storage.setItem(`fleet-campaign:save:${CAMPAIGN_ID}`, '{')
+
+    await expectCode(createCampaignPersistence(store).load(CAMPAIGN_ID), 'save_invalid')
+    expect(storage.getItem(`fleet-campaign:save:${CAMPAIGN_ID}`)).toBe('{')
   })
 })

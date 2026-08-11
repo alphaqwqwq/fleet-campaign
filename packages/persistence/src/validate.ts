@@ -32,7 +32,8 @@ const GAME_KEYS = [
 ] as const
 const PHASES = ['awaiting-player', 'active', 'completed', 'closed'] as const
 const SEATS = ['host', 'guest'] as const
-const RNG_SEED_PATTERN = /^[A-Za-z0-9_-]{22}$/
+const RNG_SEED_PATTERN = /^[A-Za-z0-9_-]{21}[AQgw]$/
+const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -104,8 +105,16 @@ export function decodeCampaignSave(value: unknown): CampaignSave {
   if (value.contentId !== 'demo-v1') {
     throw new SaveError('save_incompatible_content', 'Campaign content is incompatible')
   }
-  if (typeof value.savedAt !== 'string' || !Number.isFinite(Date.parse(value.savedAt))) {
+  if (
+    typeof value.savedAt !== 'string' ||
+    !ISO_TIMESTAMP_PATTERN.test(value.savedAt) ||
+    !Number.isFinite(Date.parse(value.savedAt)) ||
+    new Date(value.savedAt).toISOString() !== value.savedAt
+  ) {
     throw new SaveError('save_invalid', 'savedAt is invalid')
+  }
+  if (isRecord(value.gameSnapshot) && value.gameSnapshot.contentId !== 'demo-v1') {
+    throw new SaveError('save_incompatible_content', 'Campaign snapshot content is incompatible')
   }
   if (!validateGameView(value.gameSnapshot) || value.gameSnapshot.contentId !== value.contentId) {
     throw new SaveError('save_invalid', 'gameSnapshot violates demo-v1 invariants')
@@ -115,16 +124,14 @@ export function decodeCampaignSave(value: unknown): CampaignSave {
     !hasExactKeys(value.rngState, ['seed', 'index']) ||
     typeof value.rngState.seed !== 'string' ||
     !RNG_SEED_PATTERN.test(value.rngState.seed) ||
-    !isNonNegativeInteger(value.rngState.index)
+    value.rngState.index !== 0
   ) {
     throw new SaveError('save_invalid', 'rngState is invalid')
   }
   if (
     !isRecord(value.migrationMetadata) ||
     !hasExactKeys(value.migrationMetadata, ['migratedFrom']) ||
-    (value.migrationMetadata.migratedFrom !== null &&
-      (!isNonNegativeInteger(value.migrationMetadata.migratedFrom) ||
-        value.migrationMetadata.migratedFrom >= CAMPAIGN_SCHEMA_VERSION))
+    value.migrationMetadata.migratedFrom !== null
   ) {
     throw new SaveError('save_invalid', 'migrationMetadata is invalid')
   }
