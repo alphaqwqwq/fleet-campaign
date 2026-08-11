@@ -25,7 +25,6 @@ permission:
     "git branch -vv*": allow
     "git rev-parse*": allow
     "git worktree list*": allow
-    "git fetch*": allow
     "gh run list*": allow
     "gh run view*": allow
     "gh run watch*": allow

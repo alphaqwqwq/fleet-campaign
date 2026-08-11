@@ -34,6 +34,27 @@ for (const file of files.filter((file) => portable(file).startsWith(".opencode/a
   for (const forbidden of ["task: allow", '"node*": allow', '"gh api*": allow']) {
     if (content.includes(forbidden)) failures.push(`${file}: forbidden permission ${forbidden}`);
   }
+  for (const gitWrite of [
+    "git add",
+    "git commit",
+    "git push",
+    "git fetch",
+    "git merge",
+    "git rebase",
+    "git checkout",
+    "git switch",
+    "git worktree add",
+    "git worktree remove",
+    "git branch -d",
+    "git branch -D",
+  ]) {
+    const allowsWrite = content
+      .split(/\r?\n/)
+      .some((line) => line.trim().startsWith(`"${gitWrite}`) && line.trim().endsWith(": allow"));
+    if (allowsWrite) {
+      failures.push(`${file}: Git write permission must remain with ordinary Master: ${gitWrite}`);
+    }
+  }
 }
 
 for (const file of files.filter((file) => portable(file).startsWith("docs/04-plans") || portable(file).startsWith("docs/05-execs"))) {

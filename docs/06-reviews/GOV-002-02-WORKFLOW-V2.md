@@ -29,3 +29,7 @@
 - 复审发现 raw `git add/push` 可追加路径/refspec，Master 的 branch/remove 模式也难以安全表达前置核验；最终取消所有角色 Agent 的 Git 写权限，由普通 Master 编排层在释放租约后集中执行提交、报告入库、推送、合并和安全回收。
 - 治理门禁改为枚举 `docs/08-prompts/development`，只允许五个角色模板；PR #13 的专用 prompt 必须在补救时删除。
 - REVIEW-002-03 已准确记录 `f0509cd..c787a95` 恢复专用 prompt 的事实。
+
+## 第三轮 Finding 与补救
+
+- 最终复审发现 `fleet-master` 仍允许会写入 refs/FETCH_HEAD 的 `git fetch*`。现已移除，并将常见 Git 写白名单纳入 `verify:governance` 回归检查；所有角色 Agent 只保留 Git/PR/CI 只读查询。
