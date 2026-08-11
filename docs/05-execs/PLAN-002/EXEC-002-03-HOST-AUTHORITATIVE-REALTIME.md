@@ -1,7 +1,7 @@
 # EXEC-002-03：房主权威实时会话
 
 - Plan：[PLAN-002-01：游戏骨架与最小可玩电子化循环](../../04-plans/PLAN-002-01-GAME-SKELETON-MVP-LOOP.md)
-- 状态：Draft
+- 状态：Verified
 - 分支：`feature/exec-002-03-host-authoritative-realtime`
 - 依赖：EXEC-002-01 已 Merged
 - 影响域：临时房间 / 最小会话令牌 / PeerJS-WebRTC 适配 / 同步与降级
@@ -58,8 +58,15 @@
 
 ## 结果记录
 
-- 实际分支：未开始。
-- 依赖版本与传输可行性：未开始。
-- 提交 / PR / CI / Preview：未开始。
-- 自动化与人工联机验收：未开始。
-- 遗留风险与对父 Plan 验收的影响：未开始。
+- 实际分支：`feature/exec-002-03-host-authoritative-realtime`。worktree 初建时基线错误指向 `defabe0`（缺少 EXEC-002-02 持久化合并），已 `git reset --hard origin/main` 校正到 `eb0e499`；分支无唯一提交且工作树干净，该校正未销毁任何工作。
+- 依赖版本与传输可行性：新增运行时依赖 `peerjs@^1.5.5`（2026-08-11 由 npm registry 解析 `dist.tarball` 成功，`npm install` 与 `npm ci` 均通过）。peerjs 自带 `dist/types.d.ts` 与 ESM `dist/bundler.mjs`；`import('peerjs')` 在 Node 24 下可加载不崩溃，ESM 仅默认导出（named 类型仅用于类型）。API 与 Plan 契约兼容：房主接受多条 `DataConnection`、客户端按 `roomId` 确定性映射拨号、DataConnection 有序可靠；房主端点 id 用 `fc-` + roomId 的十六进制编码映射以符合 PeerJS id 首尾字母数字约束。公共信令与真实浏览器建连未在本环境验证，按 Plan 留待 EXEC-002-04/05，不以模拟成功替代。
+- 实现裁决（均在已批准契约内，未改变 protocol v1 或领域公开契约）：
+  1. `state_conflict` 的完整快照通过已批准的独立 `snapshot` 下行帧发送；被拒 v1 `command-result` 保持原字段不变。
+  2. 单个终局命令产生的多个领域事件逐条广播并分别分配严格递增的事件序列，`command-result` 携带第一个事件与最终完整快照；`expectedEventSequence` 与账本当前序列一致后才进入领域 reducer。
+  3. 加入握手使用传输级错误码（`player_seat_unavailable`、`room_not_found` 等），不扩张 protocol v1 的 `PROTOCOL_ERROR_CODES`。
+- 令牌与安全：令牌 `t_` + 256-bit URL-safe 随机值（无填充 base64url 43 字符）；房主绑定只保存 `sessionTokenFingerprint`（确定性十六进制摘要）与 `roomId + clientId + role + connectionId` 关联，不保存客机明文令牌。每条受保护 `command-intent` 帧携带令牌并逐条校验：帧 `clientId` === 绑定 `clientId` === `intent.senderClientId`，`connectionId` === 绑定连接，令牌摘要匹配；席位与角色只来自绑定，不信任自报字段；令牌不进入 URL、日志、快照、导出包或错误文案。
+- 测试证据（无网络替身）：`MemoryHostTransport`/`MemoryClientTransport` 与 PeerJS 适配器共用 `validateInboundFrame`/`validateOutboundFrame`，测试与真实适配器帧校验行为一致。12 个测试文件 184 用例通过，覆盖：外层帧 schema 校验、加入握手、唯一玩家席位（`player_seat_unavailable`）、观战只读（`forbidden_role`）、令牌/身份/绑定拒绝（`identity_invalid`）、`room_mismatch`、`protocol_invalid`、幂等重放不重复结算、`state_conflict` + 完整快照、重连完整快照、同 clientId 最后连接生效 + 旧连接 `duplicate_connection`、房主关闭广播（`room-closed`）、关闭后命令（`room_closed`）、传输不可用、客户端不暴露令牌。
+- 固定门禁（2026-08-11 本地串行）：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（12 文件 184 用例）、`npm run build` 全部通过。
+- 提交 / PR / CI / Preview：实现提交 `1b3a775`（基于 `eb0e499`）。PR / CI / Preview 证据见后续补记。
+- 自动化与人工联机验收：真实浏览器、公共信令建连与主观联机体验未在本环境执行，按 Plan 汇入父 Plan Gate；无网络替身与本地门禁成功不替代真实结论。
+- 遗留风险与对父 Plan 验收的影响：`sessionTokenFingerprint` 为确定性非加密摘要，作用仅为避免房主内存保留明文令牌，令牌熵为 256-bit 使预像不可行；未来若需密码学 verifier 应改 SHA-256。浏览器会话存储保留令牌与 `clientId` 的恢复接线、真实 PeerJS 建连与公共信令可达性留待 EXEC-002-04/05。观战者出现在公开 roster 中席位记为 `guest`（v1 schema 仅允许 host/guest 席位），语义待网页验收确认。
