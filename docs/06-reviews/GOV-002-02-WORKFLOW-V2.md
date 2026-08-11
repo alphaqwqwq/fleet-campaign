@@ -1,9 +1,9 @@
 # GOV-002-02：Workflow V2 治理审查
 
-- 状态：Second remediation in progress
-- 下一动作：对修复后的 PR #14 新 head 重新执行独立审查。
-- 证据：首轮冻结 head `ffe32b9`；独立审查结论 `remediation required`。
-- 基线：`origin/main eb0e499` → PR #14 `ffe32b9`。
+- 状态：Pass
+- 下一动作：Master 核验 PR #14 最终 checks 后合并，并核验合并后 `main` CI。
+- 证据：首轮 `ffe32b9` 与后续 `8e4685f`、`545c47f`、`5da8254` 均经独立 findings-first 复审；最终固定 head `03de5f0` 结论 `pass`。
+- 基线：`origin/main eb0e499` → PR #14 `03de5f0`。
 
 ## 首轮 Findings
 
@@ -34,3 +34,9 @@
 
 - 最终复审发现 `fleet-master` 仍允许会写入 refs/FETCH_HEAD 的 `git fetch*`。现已移除，并将常见 Git 写白名单纳入 `verify:governance` 回归检查；所有角色 Agent 只保留 Git/PR/CI 只读查询。
 - 聚焦核验要求补齐 `reset/restore/clean` 回归检测；治理门禁现覆盖 Agent 已禁止的常见 Git 写命令全集。
+
+## 最终结论
+
+- `03de5f0` 的独立聚焦复审为 `pass`：角色 Agent 无 Git 写、通用 Node/GitHub API 或子 Agent 绕过；专用 prompt 枚举和治理 CI 生效。
+- 本地治理门禁、typecheck、lint、129 项测试与 build 通过；PR #14 的 GitHub verify、Vercel 与 Preview Comments 全绿。
+- 残余风险：OpenChamber 暂停/归档 API 与普通 Master 的全局权限不由仓库 Agent 配置控制，继续以 UI 暂停 Goal 和 Git 证据核验处理。
