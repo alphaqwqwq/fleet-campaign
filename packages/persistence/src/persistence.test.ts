@@ -1,0 +1,168 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  MAX_IMPORT_BYTES,
+  SaveError,
+  createCampaignPersistence,
+  decodeCampaignSave,
+  migrateSave,
+  type CampaignSave,
+  type CampaignSaveStore,
+} from './index'
+
+const CAMPAIGN_ID = 'c_123e4567-e89b-42d3-a456-426614174000'
+const RNG_SEED = 'abcdefghijklmnopqrstuv'
+
+function fixture(overrides: Partial<CampaignSave> = {}): CampaignSave {
+  return {
+    schemaVersion: 1,
+    campaignId: CAMPAIGN_ID,
+    contentId: 'demo-v1',
+    savedAt: '2026-08-11T00:00:00.000Z',
+    gameSnapshot: {
+      contentId: 'demo-v1',
+      phase: 'active',
+      round: 1,
+      activeSeat: 'host',
+      actionPoints: 1,
+      units: [
+        { id: 'host-unit', integrity: 3 },
+        { id: 'guest-unit', integrity: 3 },
+      ],
+      winnerSeat: null,
+    },
+    rngState: { seed: RNG_SEED, index: 0 },
+    migrationMetadata: { migratedFrom: null },
+    ...overrides,
+  }
+}
+
+class MemoryStore implements CampaignSaveStore {
+  readonly saves = new Map<string, CampaignSave>()
+  writes = 0
+
+  async save(save: CampaignSave): Promise<void> {
+    this.writes += 1
+    this.saves.set(save.campaignId, structuredClone(save))
+  }
+
+  async load(campaignId: string): Promise<CampaignSave | null> {
+    return structuredClone(this.saves.get(campaignId) ?? null)
+  }
+
+  async list(): Promise<CampaignSave[]> {
+    return structuredClone([...this.saves.values()])
+  }
+
+  async delete(campaignId: string): Promise<void> {
+    this.saves.delete(campaignId)
+  }
+}
+
+function exported(save: unknown, envelope: Record<string, unknown> = {}): string {
+  return JSON.stringify({ format: 'fleet-campaign-save', formatVersion: 1, save, ...envelope })
+}
+
+async function expectCode(operation: Promise<unknown>, code: SaveError['code']): Promise<void> {
+  await expect(operation).rejects.toMatchObject({ code })
+}
+
+describe('campaign persistence', () => {
+  it('round-trips, lists by savedAt, exports, imports and deletes v1 saves', async () => {
+    const source = new MemoryStore()
+    const persistence = createCampaignPersistence(source)
+    const older = fixture()
+    const newer = fixture({
+      campaignId: 'c_223e4567-e89b-42d3-a456-426614174000',
+      savedAt: '2026-08-12T00:00:00.000Z',
+    })
+
+    await persistence.save(older)
+    await persistence.save(newer)
+    expect(await persistence.load(CAMPAIGN_ID)).toEqual(older)
+    expect((await persistence.list()).map((save) => save.campaignId)).toEqual([newer.campaignId, CAMPAIGN_ID])
+
+    const serialized = await persistence.export(CAMPAIGN_ID)
+    expect(serialized).not.toMatch(/roomId|clientId|token|receipt|peer/i)
+    const destination = new MemoryStore()
+    expect(await createCampaignPersistence(destination).import(serialized)).toEqual(older)
+    expect(destination.saves.get(CAMPAIGN_ID)).toEqual(older)
+
+    await persistence.delete(CAMPAIGN_ID)
+    expect(await persistence.load(CAMPAIGN_ID)).toBeNull()
+  })
+
+  it.each([
+    ['roomId', 'r_abcdefghijkl'],
+    ['clientId', 'u_123e4567-e89b-42d3-a456-426614174000'],
+    ['token', 'secret'],
+    ['commandReceipts', []],
+    ['connectionState', 'connected'],
+    ['peerEndpoint', 'peer'],
+    ['credential', 'secret'],
+    ['narrationInput', 'secret'],
+  ])('rejects prohibited save field %s', (field, value) => {
+    expect(() => decodeCampaignSave({ ...fixture(), [field]: value })).toThrowError(
+      expect.objectContaining({ code: 'save_invalid' }),
+    )
+  })
+
+  it('rejects malformed JSON and oversized UTF-8 before writing', async () => {
+    const store = new MemoryStore()
+    const persistence = createCampaignPersistence(store)
+    await expectCode(persistence.import('{'), 'save_invalid')
+    await expectCode(persistence.import('x'.repeat(MAX_IMPORT_BYTES + 1)), 'save_invalid')
+    expect(store.writes).toBe(0)
+  })
+
+  it.each([
+    ['unknown package version', { formatVersion: 2 }, 'save_unsupported_version'],
+    ['unknown save version', {}, 'save_unsupported_version'],
+    ['incompatible content', {}, 'save_incompatible_content'],
+    ['invalid rng seed', {}, 'save_invalid'],
+    ['invalid domain invariant', {}, 'save_invalid'],
+  ] as const)('rejects %s without overwriting', async (scenario, envelopeOverride, code) => {
+    const original = fixture()
+    const store = new MemoryStore()
+    store.saves.set(CAMPAIGN_ID, structuredClone(original))
+    const persistence = createCampaignPersistence(store)
+    let imported: Record<string, unknown> = fixture({
+      savedAt: '2026-08-13T00:00:00.000Z',
+    }) as unknown as Record<string, unknown>
+    if (scenario === 'unknown save version') imported = { ...imported, schemaVersion: 2 }
+    if (scenario === 'incompatible content') imported = { ...imported, contentId: 'future-content' }
+    if (scenario === 'invalid rng seed') imported = { ...imported, rngState: { seed: 'short', index: 0 } }
+    if (scenario === 'invalid domain invariant') {
+      imported = { ...imported, gameSnapshot: { ...fixture().gameSnapshot, actionPoints: 0 } }
+    }
+
+    await expectCode(persistence.import(exported(imported, envelopeOverride)), code)
+    expect(store.writes).toBe(0)
+    expect(store.saves.get(CAMPAIGN_ID)).toEqual(original)
+  })
+
+  it('rejects unknown fields at every persisted boundary', () => {
+    expect(() => decodeCampaignSave({
+      ...fixture(),
+      gameSnapshot: { ...fixture().gameSnapshot, token: 'secret' },
+    })).toThrowError(expect.objectContaining({ code: 'save_invalid' }))
+    expect(() => decodeCampaignSave({
+      ...fixture(),
+      rngState: { ...fixture().rngState, cursor: 0 },
+    })).toThrowError(expect.objectContaining({ code: 'save_invalid' }))
+  })
+
+  it('exposes an explicit v1 migration boundary and rejects unsupported migration', () => {
+    expect(migrateSave(1, fixture())).toEqual(fixture())
+    expect(() => migrateSave(2, fixture())).toThrowError(
+      expect.objectContaining({ code: 'save_unsupported_version' }),
+    )
+  })
+
+  it('validates storage records on load without replacing them', async () => {
+    const store = new MemoryStore()
+    store.saves.set(CAMPAIGN_ID, { ...fixture(), schemaVersion: 2 } as unknown as CampaignSave)
+    await expectCode(createCampaignPersistence(store).load(CAMPAIGN_ID), 'save_unsupported_version')
+    expect(store.writes).toBe(0)
+  })
+})
