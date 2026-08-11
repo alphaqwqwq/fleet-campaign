@@ -58,7 +58,7 @@
 ## 结果记录
 
 - 实际分支：`feature/exec-002-02-local-campaign-persistence`，隔离 worktree 基于 `origin/main` `9839b24` 创建。Terra 将测试导出辅助函数的入参从不安全的 `CampaignSave` 断言改为 `unknown`，关闭 TS2352；同时使 IndexedDB 事务或请求的同步创建异常按存储失败路径拒绝。未改变存档 v1、协议 v1 或领域契约。
-- 提交 / PR / CI / Preview：本地提交、推送和 PR/检查状态在本记录提交后创建并核验；本 Exec 不涉及 Vercel Preview 的应用变更。
+- 提交 / PR / CI / Preview：实现提交 `441fe0c`（`feat(persistence): add local campaign saves`）已推送；PR [#11](https://github.com/alphaqwqwq/fleet-campaign/pull/11) 指向 `main`。GitHub Actions `verify` 通过（18 秒，run `31465783045`）；Vercel Preview 和 Vercel Preview Comments 均通过。未合并 PR。
 - 固定门禁与存档测试：`npx vitest run packages/persistence/src/persistence.test.ts` 通过（1 文件、18 用例）；`npm run typecheck` 通过；`npm run lint` 通过；`npm run test` 通过（7 文件、101 用例）；`npm run build` 通过。审查确认保存和导入使用精确字段 schema，禁止字段拒绝且不导出；导入在唯一写入前完成大小、JSON、格式、版本、内容、领域投影和 RNG 校验；迁移只接受 v1 并拒绝未知版本；IndexedDB 请求、事务和打开错误均向端口调用者失败；包只依赖 `@fleet-campaign/protocol` 的公开入口。
 - 自动 Review / 人工验收：独立自动 Review 仍须依照本 Exec 的 Review 合同完成；用户人工验收仍聚合到父 Plan Gate。
 - 遗留风险与对父 Plan 验收的影响：浏览器真实 IndexedDB 兼容性和导入导出体验须在后续网页/Plan Gate 中验证；本 Exec 的自动化门禁不覆盖真实多浏览器交互。
