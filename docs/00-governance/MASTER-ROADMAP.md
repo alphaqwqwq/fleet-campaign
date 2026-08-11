@@ -21,7 +21,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | Master | PLAN-002 | Active | 当前普通 Master | `docs/workflow-v2` | 治理 PR 待创建 | 入库 Workflow V2 |
 | Exec | E002-03 | Pushed / remediation | 无活动写者 | `feature/exec-002-03-host-authoritative-realtime` | #13 / `c787a95` | 治理合并后修复三个 findings |
-| Review | E002-03 | Released | 原 Review 已结束 | 无活动 Review 租约 | 审查基线 `f0509cd` | 新 head 后重新独立审查 |
+| Review | E002-03 | Remediation required | 原 Review 已结束 | 无活动 Review 租约 | [REVIEW-002-03](../06-reviews/PLAN-002/REVIEW-002-03-HOST-AUTHORITATIVE-REALTIME.md) / `f0509cd` | 新 head 后重新独立审查 |
 | Browser | P002-01 | Not started | 无 | 无 | 无 | E002-04 页面可用后启动 |
 
 ## 下一顺序
@@ -38,3 +38,9 @@
 - `roomId`、`campaignId`、`clientId` 和 token 不混用；房间临时，战役档长期本地。
 - 不改变 protocol v1、存档 v1、RNG、认证或发布架构，除非先经 Plan/ADR 与用户裁决。
 - 不接入账号、云存档、常驻后端、房主迁移、真实 LLM 或未授权原作内容。
+
+## 待回收历史资产
+
+- EXEC-002-02 的实现、Review 与 merge-record worktree均已完成，治理 PR 合并后核验干净并回收。
+- 旧协议补救共享工作区含用户未提交变更，不自动清理或切换。
+- 每次回收前必须核对 worktree 干净、PR 已合并且没有独有未提交文件。

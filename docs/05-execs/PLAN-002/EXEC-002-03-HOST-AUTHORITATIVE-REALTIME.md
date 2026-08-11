@@ -1,7 +1,10 @@
 # EXEC-002-03：房主权威实时会话
 
 - Plan：[PLAN-002-01：游戏骨架与最小可玩电子化循环](../../04-plans/PLAN-002-01-GAME-SKELETON-MVP-LOOP.md)
-- 状态：Draft
+- 状态：Pushed / remediation required
+- 下一动作：关闭 REVIEW-002-03 的两个 P1 与一个 P2 finding，串行重跑固定门禁并更新 PR #13。
+- 证据：PR #13 head `c787a95`；verify、Vercel、Preview Comments 成功；独立 Review 不放行。
+- 基线：`origin/main` `eb0e499` → PR #13 `c787a95`；Review 固定 head `f0509cd`。
 - 分支：`feature/exec-002-03-host-authoritative-realtime`
 - 依赖：EXEC-002-01 已 Merged
 - 影响域：临时房间 / 最小会话令牌 / PeerJS-WebRTC 适配 / 同步与降级
@@ -26,7 +29,7 @@
 
 - `packages/realtime/**`：传输抽象、PeerJS/WebRTC 适配、连接状态与测试替身。
 - 仅为传输编排所必需的 `apps/web/src/application/**` 无 UI 应用服务接口。
-- 传输/应用服务测试、必要依赖和公开入口、本 Exec 文档与对应短提示词。
+- 传输/应用服务测试、必要依赖和公开入口及本 Exec 文档；会话使用通用 Exec 模板。
 
 ## 禁止范围
 
@@ -54,12 +57,12 @@
 - 合并后使用 `git revert` 回滚；房间关闭不尝试迁移。
 - PeerJS/WebRTC API、依赖、信令服务可达性、安全边界或浏览器兼容性需改变已批准契约时停止并回到 Plan/ADR。
 - 任一门禁、传输测试或人工验证失败均保留证据并停止，不以本地模拟成功替代真实结论。
-- Flash 一次可信修复仍失败、Review 失败或出现复杂跨包根因时，由 Master fork 原 Exec 给 `fleet-exec`/Terra；补救不得改变房主权威、认证或协议 v1。
+- Review 的局部 finding 先回原 Exec 完成一次可信修复；仍失败、出现复杂跨包根因或可能改变契约时才创建 Terra 补救。补救不得改变房主权威、认证或协议 v1。
 
 ## 结果记录
 
-- 实际分支：未开始。
-- 依赖版本与传输可行性：未开始。
-- 提交 / PR / CI / Preview：未开始。
-- 自动化与人工联机验收：未开始。
-- 遗留风险与对父 Plan 验收的影响：未开始。
+- 实际分支：`feature/exec-002-03-host-authoritative-realtime`，当前 head `c787a95`。
+- 依赖版本与传输可行性：`peerjs@^1.5.5` 与无网络 memory transport 已实现；公共信令和真实浏览器建连仍未验证。
+- 提交 / PR / CI / Preview：PR #13 Open 且 mergeable；当前 head 的 verify、Vercel 与 Preview Comments 成功。
+- 自动化与人工联机验收：此前固定门禁为 12 文件、184 用例通过；该证据早于 Review 补救，补救后必须重跑。真实浏览器/公共信令留待后续 Browser。
+- 遗留风险与对父 Plan 验收的影响：Review 要求显式 leave 撤销 token、移除 realtime→domain 依赖，并补终局双事件广播断言；当前不满足合并或 EXEC-002-04 准入。

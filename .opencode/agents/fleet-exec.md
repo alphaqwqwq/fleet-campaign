@@ -7,7 +7,7 @@ permission:
   glob: allow
   grep: allow
   list: allow
-  task: allow
+  task: deny
   todowrite: allow
   question: allow
   webfetch: allow
@@ -22,7 +22,6 @@ permission:
     "npm run build*": allow
     "npx vitest*": allow
     "npm view*": allow
-    "node*": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
@@ -35,7 +34,6 @@ permission:
     "git commit*": allow
     "git push origin feature/*": allow
     "git push origin HEAD:feature/*": allow
-    "gh api*": allow
     "gh run list*": allow
     "gh run view*": allow
     "gh run watch*": allow
@@ -48,9 +46,11 @@ permission:
     "git restore*": deny
     "git clean*": deny
     "git push --force*": deny
+    "git push *--force*": deny
     "git push -f*": deny
     "git push origin main*": deny
     "git commit --amend*": deny
+    "git commit *--amend*": deny
     "git rebase*": deny
     "gh pr merge*": deny
   external_directory: deny

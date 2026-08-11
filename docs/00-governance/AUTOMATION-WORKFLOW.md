@@ -13,7 +13,7 @@
 ## 单写者租约
 
 - 任一 worktree 同一时刻只有一个写者。路线图活动表记录会话、worktree、分支、PR/head 和下一动作。
-- Master 不与 Exec 并发编辑功能 worktree。Review 从固定 PR head 建 detached worktree，只审不修。
+- Master 不与 Exec 并发编辑功能 worktree。Review 从固定 PR head 建 detached worktree，只审不修；Review 只可将 `docs/06-reviews/**` 报告作为新提交快进到被审 feature PR，使结论进入 Git 真源。
 - 子会话 idle 且无新增证据时释放租约；状态不明时先检查 Git，不重复发送消息制造并发。
 
 ## Goal Mode
@@ -25,7 +25,7 @@
 
 ## 会话与资产预算
 
-- 每个 Exec 默认一个 EXEC 会话和一个 REVIEW 会话；仅在真实升级条件满足时增加一个 REMEDIATION 会话。
+- 每个 Exec 默认一个 EXEC 会话和一个 REVIEW 会话；局部 finding 回原 EXEC 会话修复，只有真实升级条件满足时才增加一个 REMEDIATION 会话。
 - PLAN-002 共用一个 Browser 会话。等待 CI、合并、证据更新、标题修正和运行诊断不得单独创建会话。
 - 活动 worktree 上限：一个用户共享工作区、一个治理 worktree、一个活动 Exec worktree、一个临时 Review worktree。
 - PR 合并且 `main` CI 成功后，核验干净并回收 Exec/Review worktree和已合并本地分支。dirty、未合并或状态不明的对象不得自动删除。
@@ -40,7 +40,7 @@
 
 ## 权限与合并
 
-- fleet Agent 的 bash 采用 broad deny 后精确 allow；白名单外命令 fail-fast，禁止 `ask` 静默挂起。
+- fleet Agent 的 bash 采用 broad deny 后精确 allow；白名单外命令 fail-fast，禁止 `ask` 静默挂起。角色 Agent 禁止通用 `node*`、`gh api*` 和子 Agent 调度等可绕过职责边界的入口。
 - Exec 不合并自己的 PR。Master 仅在依赖、固定门禁、独立 Review `pass`、PR checks、结果记录和契约边界全部满足后合并。
 - 合并后记录 merge commit 与 `main` CI；回滚使用 `git revert` 和独立 PR，不改写历史。
 
