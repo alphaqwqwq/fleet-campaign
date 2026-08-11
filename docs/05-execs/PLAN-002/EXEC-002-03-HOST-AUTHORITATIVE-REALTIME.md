@@ -1,9 +1,9 @@
 # EXEC-002-03：房主权威实时会话
 
 - Plan：[PLAN-002-01：游戏骨架与最小可玩电子化循环](../../04-plans/PLAN-002-01-GAME-SKELETON-MVP-LOOP.md)
-- 状态：Verified / awaiting independent re-review
-- 下一动作：Master 提交 PeerJS leave 确认补救并推送，冻结新 head 对最后 P1 聚焦复审。
-- 证据：首轮三项 finding 已关闭；复审发现 PeerJS send 后立即 close 的交付竞态，现由 `leave-accepted` 确认、超时保留连接和可重试确认闭环。定向 61 项、全量 190 项及固定门禁通过。
+- 状态：Pushed / Review pass
+- 下一动作：Master 等待本 Review 证据提交的 PR #13 checks，全绿后合并并核验 `main` CI。
+- 证据：最终固定实现 head `91def22` 独立 Review `pass`；定向 61 项、全量 190 项、固定门禁与 PR checks 全绿。
 - 基线：已合入 `origin/main` `69e4fe6` 的 Workflow V2；补救前 PR #13 head `c787a95`，首轮 Review 固定 head `f0509cd`；补救提交 `3e2e213` 已推送。
 - 分支：`feature/exec-002-03-host-authoritative-realtime`
 - 依赖：EXEC-002-01 已 Merged
