@@ -3,6 +3,7 @@ import { INTENT_COMMAND_TYPES } from './command-intent'
 import type { CommandResult } from './command-result'
 import type { BroadcastEvent } from './broadcast-event'
 import { BROADCAST_EVENT_TYPES } from './broadcast-event'
+import type { BroadcastEventType } from './broadcast-event'
 import type { Snapshot } from './snapshot'
 import { ROSTER_ROLES, VISIBILITIES } from './snapshot'
 import { PROTOCOL_VERSION } from './version'
@@ -38,6 +39,45 @@ function rejectUnknownKeys(record: UnknownRecord, allowed: readonly string[], er
 function validateNonNegativeInt(value: unknown, field: string, errors: string[]): void {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     errors.push(`${field} must be a non-negative integer`)
+  }
+}
+
+function validateSeat(value: unknown, field: string, errors: string[]): void {
+  if (typeof value !== 'string' || !SEATS.includes(value)) {
+    errors.push(`${field} must be host or guest`)
+  }
+}
+
+/** 每种已批准事件类型只允许其领域事实映射的公开载荷字段，未知字段一律拒绝。 */
+const PUBLIC_PAYLOAD_FIELDS: Record<BroadcastEventType, readonly string[]> = {
+  'demo-started': ['round', 'activeSeat'],
+  'action-confirmed': ['targetSeat', 'targetIntegrity'],
+  'demo-completed': ['winnerSeat'],
+  'room-closed': [],
+}
+
+function validatePublicPayload(type: BroadcastEventType, payload: UnknownRecord, errors: string[]): void {
+  const allowed = PUBLIC_PAYLOAD_FIELDS[type]
+  rejectUnknownKeys(payload, allowed, errors)
+  for (const field of allowed) {
+    if (payload[field] === undefined) {
+      errors.push(`publicPayload.${field} must be present for ${type}`)
+    }
+  }
+  if (allowed.includes('round')) {
+    validateNonNegativeInt(payload.round, 'publicPayload.round', errors)
+  }
+  if (allowed.includes('activeSeat')) {
+    validateSeat(payload.activeSeat, 'publicPayload.activeSeat', errors)
+  }
+  if (allowed.includes('targetSeat')) {
+    validateSeat(payload.targetSeat, 'publicPayload.targetSeat', errors)
+  }
+  if (allowed.includes('targetIntegrity')) {
+    validateNonNegativeInt(payload.targetIntegrity, 'publicPayload.targetIntegrity', errors)
+  }
+  if (allowed.includes('winnerSeat')) {
+    validateSeat(payload.winnerSeat, 'publicPayload.winnerSeat', errors)
   }
 }
 
@@ -77,15 +117,25 @@ function validateGameView(game: UnknownRecord, errors: string[]): void {
         errors.push(`game.units[${index}] must be an object`)
         return
       }
-      if (typeof unit.id !== 'string' || unit.id.length === 0) {
-        errors.push(`game.units[${index}].id must be a non-empty string`)
+      if (unit.id !== 'host-unit' && unit.id !== 'guest-unit') {
+        errors.push(`game.units[${index}].id must be host-unit or guest-unit`)
       }
       validateNonNegativeInt(unit.integrity, `game.units[${index}].integrity`, errors)
+      rejectUnknownKeys(unit, ['id', 'integrity'], errors)
     })
   }
   if (game.winnerSeat !== null && !SEATS.includes(game.winnerSeat as string)) {
     errors.push('game.winnerSeat must be host, guest or null')
   }
+  rejectUnknownKeys(game, [
+    'contentId',
+    'phase',
+    'round',
+    'activeSeat',
+    'actionPoints',
+    'units',
+    'winnerSeat',
+  ], errors)
 }
 
 /**
@@ -110,7 +160,7 @@ export function validateCommandIntent(input: unknown): Validation<CommandIntent>
     errors.push('kind must be "command-intent"')
   }
   if (!isValidIdempotencyKey(input.idempotencyKey)) {
-    errors.push('idempotencyKey must be a url-safe string of 1-32 characters')
+    errors.push('idempotencyKey must be a url-safe 128-bit key of 22-32 characters')
   }
   validateNonNegativeInt(input.expectedEventSequence, 'expectedEventSequence', errors)
   if (!isRecord(input.command)) {
@@ -147,6 +197,8 @@ export function validateBroadcastEvent(input: unknown): Validation<BroadcastEven
   }
   if (!isRecord(input.publicPayload)) {
     errors.push('publicPayload must be an object')
+  } else if (BROADCAST_EVENT_TYPES.includes(input.type as never)) {
+    validatePublicPayload(input.type as BroadcastEventType, input.publicPayload, errors)
   }
   rejectUnknownKeys(input, [
     'protocolVersion',

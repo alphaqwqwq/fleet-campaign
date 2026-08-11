@@ -18,7 +18,7 @@ const ROOM_ID = 'r_abcdEFGHij12'
 const CLIENT_ID = 'u_12345678-1234-1234-1234-123456789abc'
 const CAMPAIGN_ID = 'c_12345678-1234-1234-1234-123456789abc'
 const MESSAGE_ID = 'm_001'
-const KEY = 'ab12_CD-ef'
+const KEY = 'qK8_xM3-vN5_pZ1-wT9_yA'
 
 function startedGame() {
   const initial = createInitialState(DEMO_V1_CONTENT)
@@ -50,7 +50,7 @@ function validBroadcastEvent() {
     eventId: 'e_event-1',
     type: 'demo-started',
     actorSeat: 'host',
-    publicPayload: { round: 1 },
+    publicPayload: { round: 1, activeSeat: 'host' },
   }
 }
 
@@ -108,6 +108,12 @@ describe('validateCommandIntent', () => {
 
   it.each([
     ['empty', ''],
+    ['single character', 'a'],
+    ['too short for 128-bit', 'a'.repeat(21)],
+    ['23 characters', 'a'.repeat(23)],
+    ['24 characters', 'a'.repeat(24)],
+    ['31 characters', 'a'.repeat(31)],
+    ['32 characters', 'a'.repeat(32)],
     ['too long', 'a'.repeat(33)],
     ['unsafe characters', 'abc def'],
   ])('rejects an idempotencyKey that is %s', (_label, key) => {
@@ -181,6 +187,80 @@ describe('validateBroadcastEvent', () => {
     const result = validateBroadcastEvent({ ...validBroadcastEvent(), publicPayload: undefined })
     expect(result.ok).toBe(false)
   })
+
+  it('rejects an unknown field in a demo-started publicPayload', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      publicPayload: { round: 1, activeSeat: 'host', token: 't_secret' },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('token')
+  })
+
+  it('rejects a demo-started payload missing activeSeat', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      publicPayload: { round: 1 },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('publicPayload')
+  })
+
+  it('rejects a demo-started payload with an invalid activeSeat', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      publicPayload: { round: 1, activeSeat: 'spectator' },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('publicPayload')
+  })
+
+  it('accepts an action-confirmed event payload', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      type: 'action-confirmed',
+      publicPayload: { targetSeat: 'guest', targetIntegrity: 2 },
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects an action-confirmed payload with an unknown field', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      type: 'action-confirmed',
+      publicPayload: { targetSeat: 'guest', targetIntegrity: 2, winnerSeat: 'host' },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('winnerSeat')
+  })
+
+  it('accepts a demo-completed event payload', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      type: 'demo-completed',
+      publicPayload: { winnerSeat: 'host' },
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('accepts a room-closed event with an empty publicPayload', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      type: 'room-closed',
+      publicPayload: {},
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects a room-closed payload that carries any field', () => {
+    const result = validateBroadcastEvent({
+      ...validBroadcastEvent(),
+      type: 'room-closed',
+      publicPayload: { reason: 'host-left' },
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('reason')
+  })
 })
 
 describe('validateSnapshot', () => {
@@ -217,6 +297,39 @@ describe('validateSnapshot', () => {
     })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.errors.join()).toContain('game.phase')
+  })
+
+  it('rejects a game projection with an unknown field', () => {
+    const result = validateSnapshot({
+      ...validSnapshot(),
+      game: { ...validSnapshot().game, secret: 'token' } as never,
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('secret')
+  })
+
+  it('rejects a game unit carrying an unknown field', () => {
+    const result = validateSnapshot({
+      ...validSnapshot(),
+      game: {
+        ...validSnapshot().game,
+        units: [{ id: 'host-unit', integrity: 3, token: 't_secret' }],
+      } as never,
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('token')
+  })
+
+  it('rejects a game unit with an unknown unit id', () => {
+    const result = validateSnapshot({
+      ...validSnapshot(),
+      game: {
+        ...validSnapshot().game,
+        units: [{ id: 'siege-unit', integrity: 3 }],
+      } as never,
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.join()).toContain('units[0].id')
   })
 })
 
@@ -280,13 +393,18 @@ describe('validateCommandResult', () => {
 })
 
 describe('isValidIdempotencyKey', () => {
-  it('accepts url-safe keys up to 32 chars', () => {
-    expect(isValidIdempotencyKey('a')).toBe(true)
-    expect(isValidIdempotencyKey('A_-09z'.repeat(5).slice(0, 32))).toBe(true)
+  it('accepts an exact 22-character url-safe 128-bit key', () => {
+    expect(isValidIdempotencyKey('a'.repeat(22))).toBe(true)
   })
 
-  it('rejects empty, oversized and unsafe keys', () => {
+  it('rejects empty, non-22-character and unsafe keys', () => {
     expect(isValidIdempotencyKey('')).toBe(false)
+    expect(isValidIdempotencyKey('a')).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(21))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(23))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(24))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(31))).toBe(false)
+    expect(isValidIdempotencyKey('a'.repeat(32))).toBe(false)
     expect(isValidIdempotencyKey('a'.repeat(33))).toBe(false)
     expect(isValidIdempotencyKey('has space')).toBe(false)
     expect(isValidIdempotencyKey(42)).toBe(false)
