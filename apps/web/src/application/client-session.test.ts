@@ -138,7 +138,7 @@ describe('createClientSession', () => {
     expect(controller.view.snapshot?.eventSequence).toBe(1)
   })
 
-  it('revokes the token on explicit leave while preserving disconnect reconnect', () => {
+  it('revokes the token on acknowledged explicit leave so a stale token is rejected', async () => {
     const itx = integration()
     const clientId = generateClientId()
     let token = ''
@@ -146,10 +146,22 @@ describe('createClientSession', () => {
     first.controller.connect(itx.roomId, 'player')
     expect(first.controller.view.status).toBe('connected')
 
-    first.controller.close()
+    await expect(first.controller.close()).resolves.toBe(true)
     const stale = itx.dial(clientId, token)
     stale.controller.connect(itx.roomId, 'player')
     expect(stale.controller.view.status).toBe('closed')
     expect(stale.controller.view.lastError?.code).toBe('identity_invalid')
   })
+
+  it('keeps the connection open when leave is not acknowledged', async () => {
+    const itx = integration()
+    const session = itx.dial()
+    session.controller.connect(itx.roomId, 'player')
+    const originalSend = session.clientTransport.send.bind(session.clientTransport)
+    session.clientTransport.send = (frame) => frame.frame === 'leave-request' ? true : originalSend(frame)
+
+    await expect(session.controller.close()).resolves.toBe(false)
+    expect(session.controller.view.status).toBe('connected')
+    expect(session.clientTransport.status).toBe('connected')
+  }, 2_000)
 })

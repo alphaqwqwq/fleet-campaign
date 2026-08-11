@@ -117,6 +117,12 @@ describe('validateInboundFrame', () => {
 })
 
 describe('validateOutboundFrame', () => {
+  it('accepts leave-accepted and rejects unknown fields', () => {
+    const frame = { frame: 'leave-accepted', protocolVersion: 1, messageId: 'm-left', roomId: ROOM, clientId: CLIENT }
+    expect(validateOutboundFrame(frame).ok).toBe(true)
+    expect(validateOutboundFrame({ ...frame, token: generateSessionToken() }).ok).toBe(false)
+  })
+
   it('accepts room-closed and rejects unknown fields', () => {
     const frame = { frame: 'room-closed', protocolVersion: 1, messageId: 'm-close', roomId: ROOM }
     expect(validateOutboundFrame(frame).ok).toBe(true)

@@ -59,6 +59,17 @@ function intentFrame(opts: {
   }
 }
 
+function leaveFrame(clientId: string, roomId: string, token: string) {
+  return {
+    frame: 'leave-request' as const,
+    protocolVersion: 1 as const,
+    messageId: 'm-leave',
+    roomId,
+    clientId,
+    token,
+  }
+}
+
 function harness() {
   const hostTransport = createMemoryHostTransport()
   const hostClientId = generateClientId()
@@ -509,6 +520,30 @@ describe('createHostSession', () => {
     expect(snapshot.snapshot.game.phase).toBe('active')
     expect(snapshot.snapshot.eventSequence).toBe(1)
     expect(snapshot.snapshot.roster).toContainEqual({ clientId: playerId, seat: 'guest', role: 'player' })
+  })
+
+  it('explicit leave revokes the token while a pure network disconnect keeps it valid', () => {
+    const h = harness()
+
+    const explicit = h.join(generateClientId(), 'player')
+    const explicitAccepted = h.acceptedFor(explicit)
+    expect(
+      explicit.client.send(leaveFrame(explicitAccepted.clientId, h.roomId, explicitAccepted.token)),
+    ).toBe(true)
+    expect(explicit.frames.filter((frame) => frame.frame === 'leave-accepted')).toHaveLength(1)
+    expect(
+      explicit.client.send(leaveFrame(explicitAccepted.clientId, h.roomId, explicitAccepted.token)),
+    ).toBe(true)
+    expect(explicit.frames.filter((frame) => frame.frame === 'leave-accepted')).toHaveLength(2)
+    const stale = h.join(explicitAccepted.clientId, 'player', null, explicitAccepted.token)
+    const rejected = stale.frames.find((f) => f.frame === 'join-rejected')
+    expect(rejected && 'errorCode' in rejected ? rejected.errorCode : null).toBe('identity_invalid')
+
+    const dropped = h.join(generateClientId(), 'player')
+    const droppedAccepted = h.acceptedFor(dropped)
+    dropped.client.close()
+    const reconnected = h.join(droppedAccepted.clientId, 'player', null, droppedAccepted.token)
+    expect(h.acceptedFor(reconnected).token).toBe(droppedAccepted.token)
   })
 
   it('broadcasts room-closed and ends the endpoint on closeRoom', () => {

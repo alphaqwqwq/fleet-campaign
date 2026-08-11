@@ -104,6 +104,10 @@ export function validateOutboundFrame(input: unknown): Validation<HostToClientFr
       if (!JOIN_ERROR_CODES.includes(input.errorCode as never)) errors.push('errorCode must be a known join error code')
       if (typeof input.messageKey !== 'string' || input.messageKey.length === 0) errors.push('messageKey must be non-empty')
       break
+    case 'leave-accepted':
+      rejectUnknownKeys(input, ['frame', 'protocolVersion', 'messageId', 'roomId', 'clientId'], errors)
+      if (!isValidClientId(input.clientId)) errors.push('clientId must match u_ + uuid')
+      break
     case 'command-result': {
       rejectUnknownKeys(input, ['frame', 'protocolVersion', 'messageId', 'roomId', 'clientId', 'result'], errors)
       if (!isValidClientId(input.clientId)) errors.push('clientId must match u_ + uuid')

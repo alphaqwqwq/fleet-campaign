@@ -18,6 +18,7 @@ export class HostSessionController {
   private game: GameState | null = null
   private ledger = createSessionLedger<CommandResult>()
   private readonly bindings = new Map<string, Binding>()
+  private readonly revokedTokens = new Map<string, string>()
   private hostCommandCounter = 0
 
   public constructor(private readonly options: HostSessionOptions) {
@@ -65,6 +66,7 @@ export class HostSessionController {
     this.options.hostTransport.broadcast({ frame: 'room-closed', protocolVersion: 1, messageId: 'room-closed', roomId: this.roomId })
     this.options.hostTransport.close()
     this.bindings.clear()
+    this.revokedTokens.clear()
   }
 
   private receive(connectionId: string, frame: ClientToHostFrame): void {
@@ -89,14 +91,30 @@ export class HostSessionController {
 
   private leave(connectionId: string, frame: Extract<ClientToHostFrame, { frame: 'leave-request' }>): void {
     const binding = this.bindings.get(frame.clientId)
+    const fingerprint = sessionTokenFingerprint(frame.token)
+    if (frame.roomId === this.roomId && !binding && this.revokedTokens.get(frame.clientId) === fingerprint) {
+      this.sendLeaveAccepted(connectionId, frame.clientId)
+      return
+    }
     if (
       frame.roomId !== this.roomId
       || !binding
       || binding.connectionId !== connectionId
-      || binding.tokenFingerprint !== sessionTokenFingerprint(frame.token)
+      || binding.tokenFingerprint !== fingerprint
     ) return
     this.bindings.delete(frame.clientId)
-    this.options.hostTransport.closeClient(connectionId)
+    this.revokedTokens.set(frame.clientId, fingerprint)
+    this.sendLeaveAccepted(connectionId, frame.clientId)
+  }
+
+  private sendLeaveAccepted(connectionId: string, clientId: string): void {
+    this.options.hostTransport.sendTo(connectionId, {
+      frame: 'leave-accepted',
+      protocolVersion: 1,
+      messageId: 'leave-accepted',
+      roomId: this.roomId,
+      clientId,
+    })
   }
 
   private safeIdempotencyKey(value: unknown): string {
@@ -127,6 +145,7 @@ export class HostSessionController {
     const token = generateSessionToken()
     const binding: Binding = { clientId: frame.clientId, role, seat: role === 'spectator' ? null : 'guest', tokenFingerprint: sessionTokenFingerprint(token), connectionId }
     this.bindings.set(frame.clientId, binding)
+    this.revokedTokens.delete(frame.clientId)
     this.options.hostTransport.sendTo(connectionId, { frame: 'join-accepted', protocolVersion: 1, messageId: 'join-accepted', roomId: this.roomId, clientId: frame.clientId, token, role, seat: binding.seat })
     this.sendSnapshot(connectionId, binding)
   }

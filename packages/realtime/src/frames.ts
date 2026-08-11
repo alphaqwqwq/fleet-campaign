@@ -87,6 +87,15 @@ export interface JoinRejectedFrame {
   messageKey: string
 }
 
+/** 房主下行：令牌已撤销，客户端可以安全关闭传输。 */
+export interface LeaveAcceptedFrame {
+  frame: 'leave-accepted'
+  protocolVersion: ProtocolVersion
+  messageId: string
+  roomId: string
+  clientId: string
+}
+
 /** 房主下行：对命令意图的裁决结果，`result` 为 protocol v1 信封。 */
 export interface CommandResultFrame {
   frame: 'command-result'
@@ -138,6 +147,7 @@ export type ClientToHostFrame = JoinRequestFrame | CommandIntentFrame | LeaveReq
 export type HostToClientFrame =
   | JoinAcceptedFrame
   | JoinRejectedFrame
+  | LeaveAcceptedFrame
   | CommandResultFrame
   | BroadcastEventFrame
   | SnapshotFrame

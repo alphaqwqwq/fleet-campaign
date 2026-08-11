@@ -44,6 +44,7 @@ export interface ClientSessionOptions {
   createMessageId?: () => string
   resumeToken?: string
   onToken?: (token: string) => void
+  leaveTimeoutMs?: number
 }
 
 export class ClientSessionController {
@@ -59,6 +60,7 @@ export class ClientSessionController {
   private roomId = ''
   private requestedRole: RequestedRole = 'spectator'
   private token: string | null = null
+  private leaveAcknowledged: (() => void) | null = null
 
   constructor(private readonly options: ClientSessionOptions) {
     this.token = options.resumeToken ?? null
@@ -108,20 +110,43 @@ export class ClientSessionController {
     })
   }
 
-  close(): void {
-    if (this.token && this.roomId && this.view.status === 'connected') {
-      this.options.clientTransport.send({
+  async close(): Promise<boolean> {
+    if (!this.token || !this.roomId || this.view.status !== 'connected') {
+      this.options.clientTransport.close()
+      this.token = null
+      this.view.status = 'closed'
+      return true
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const acknowledged = new Promise<void>((resolve) => { this.leaveAcknowledged = resolve })
+    const sent = this.options.clientTransport.send({
         frame: 'leave-request',
         protocolVersion: 1,
         messageId: this.messageId(),
         roomId: this.roomId,
         clientId: this.options.clientId,
         token: this.token,
-      })
+    })
+    if (!sent) {
+      this.leaveAcknowledged = null
+      return false
     }
+
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timeoutId = setTimeout(() => resolve('timeout'), this.options.leaveTimeoutMs ?? 1_000)
+    })
+    const outcome = await Promise.race([acknowledged.then(() => 'acknowledged' as const), timeout])
+    if (timeoutId) clearTimeout(timeoutId)
+    if (outcome === 'timeout') {
+      this.leaveAcknowledged = null
+      return false
+    }
+
     this.options.clientTransport.close()
     this.token = null
     this.view.status = 'closed'
+    return true
   }
 
   private sendJoin(): void {
@@ -179,6 +204,11 @@ export class ClientSessionController {
       case 'join-rejected':
         this.view.status = frame.errorCode === 'transport_unavailable' ? 'transport_unavailable' : 'closed'
         this.view.lastError = { code: frame.errorCode, messageKey: frame.messageKey }
+        break
+      case 'leave-accepted':
+        if (frame.clientId !== this.options.clientId || frame.roomId !== this.roomId) return
+        this.leaveAcknowledged?.()
+        this.leaveAcknowledged = null
         break
       case 'snapshot':
         if (frame.clientId === this.options.clientId) this.view.snapshot = frame.snapshot
