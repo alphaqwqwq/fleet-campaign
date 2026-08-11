@@ -26,7 +26,7 @@
 
 - `packages/persistence/**`：存档 schema、编码/解码、迁移链、存储端口和浏览器适配器。
 - `packages/persistence/**` 的测试、必要的公开入口及仅用于既有包互操作的最小类型导出。
-- 本 Exec 文档与对应短提示词。
+- 本 Exec 文档；会话使用通用 Exec 模板。
 
 ## 禁止范围
 

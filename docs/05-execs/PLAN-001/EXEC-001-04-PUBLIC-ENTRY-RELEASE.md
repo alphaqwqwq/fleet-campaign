@@ -43,7 +43,7 @@
 - `fleet-campaign`：`docs/**`、`scripts/Invoke-VercelFleetCnameDns.ps1`、`.github/**`、根配置及本 Exec 已存在的允许文件；仅为承接 EXEC-001-03 已验证内容所需的提交与发布证据更新，不扩展游戏功能。
 - `alphaqwq-home`：仅修改 `src/App.tsx` 内 `fleet-room` 工具卡片的 URL、可见名称/说明和标签，使其明确指向 `https://fleet.alphaqwq.xyz`；不进行无关重构。
 - GitHub/Vercel：只在用户最终确认的旧 `fleet-room` 准确资源清单内执行删除；删除前后的查询与结果只记录非机密标识、时间和状态。
-- 本 Exec 文档、对应短提示词和提示词索引。
+- 本 Exec 文档和提示词索引；会话入口使用通用 Exec 模板。
 
 ## 执行顺序与验收
 

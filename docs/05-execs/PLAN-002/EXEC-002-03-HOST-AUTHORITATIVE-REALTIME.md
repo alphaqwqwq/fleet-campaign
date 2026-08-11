@@ -1,7 +1,10 @@
 # EXEC-002-03：房主权威实时会话
 
 - Plan：[PLAN-002-01：游戏骨架与最小可玩电子化循环](../../04-plans/PLAN-002-01-GAME-SKELETON-MVP-LOOP.md)
-- 状态：Pushed
+- 状态：Pushed / remediation required
+- 下一动作：关闭 REVIEW-002-03 的两个 P1 与一个 P2 finding，串行重跑固定门禁并更新 PR #13。
+- 证据：PR #13 head `c787a95`；verify、Vercel、Preview Comments 成功；独立 Review 不放行。
+- 基线：`origin/main` `eb0e499` → PR #13 `c787a95`；Review 固定 head `f0509cd`。
 - 分支：`feature/exec-002-03-host-authoritative-realtime`
 - 依赖：EXEC-002-01 已 Merged
 - 影响域：临时房间 / 最小会话令牌 / PeerJS-WebRTC 适配 / 同步与降级
@@ -26,7 +29,7 @@
 
 - `packages/realtime/**`：传输抽象、PeerJS/WebRTC 适配、连接状态与测试替身。
 - 仅为传输编排所必需的 `apps/web/src/application/**` 无 UI 应用服务接口。
-- 传输/应用服务测试、必要依赖和公开入口、本 Exec 文档与对应短提示词。
+- 传输/应用服务测试、必要依赖和公开入口及本 Exec 文档；会话使用通用 Exec 模板。
 
 ## 禁止范围
 
@@ -54,7 +57,7 @@
 - 合并后使用 `git revert` 回滚；房间关闭不尝试迁移。
 - PeerJS/WebRTC API、依赖、信令服务可达性、安全边界或浏览器兼容性需改变已批准契约时停止并回到 Plan/ADR。
 - 任一门禁、传输测试或人工验证失败均保留证据并停止，不以本地模拟成功替代真实结论。
-- Flash 一次可信修复仍失败、Review 失败或出现复杂跨包根因时，由 Master fork 原 Exec 给 `fleet-exec`/Terra；补救不得改变房主权威、认证或协议 v1。
+- Review 的局部 finding 先回原 Exec 完成一次可信修复；仍失败、出现复杂跨包根因或可能改变契约时才创建 Terra 补救。补救不得改变房主权威、认证或协议 v1。
 
 ## 结果记录
 
@@ -67,6 +70,7 @@
 - 令牌与安全：令牌 `t_` + 256-bit URL-safe 随机值（无填充 base64url 43 字符）；房主绑定只保存 `sessionTokenFingerprint`（确定性十六进制摘要）与 `roomId + clientId + role + connectionId` 关联，不保存客机明文令牌。每条受保护 `command-intent` 帧携带令牌并逐条校验：帧 `clientId` === 绑定 `clientId` === `intent.senderClientId`，`connectionId` === 绑定连接，令牌摘要匹配；席位与角色只来自绑定，不信任自报字段；令牌不进入 URL、日志、快照、导出包或错误文案。
 - 测试证据（无网络替身）：`MemoryHostTransport`/`MemoryClientTransport` 与 PeerJS 适配器共用 `validateInboundFrame`/`validateOutboundFrame`，测试与真实适配器帧校验行为一致。12 个测试文件 184 用例通过，覆盖：外层帧 schema 校验、加入握手、唯一玩家席位（`player_seat_unavailable`）、观战只读（`forbidden_role`）、令牌/身份/绑定拒绝（`identity_invalid`）、`room_mismatch`、`protocol_invalid`、幂等重放不重复结算、`state_conflict` + 完整快照、重连完整快照、同 clientId 最后连接生效 + 旧连接 `duplicate_connection`、房主关闭广播（`room-closed`）、关闭后命令（`room_closed`）、传输不可用、客户端不暴露令牌。
 - 固定门禁（2026-08-11 本地串行）：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（12 文件 184 用例）、`npm run build` 全部通过。
-- 提交 / PR / CI / Preview：实现提交 `1b3a775`，结果记录与短提示词提交 `c342cfe`、`21008a3`、`e64c0e7`、`9d71e86`（分支头 `9d71e86`，均基于 `eb0e499`，已推送 `feature/exec-002-03-host-authoritative-realtime`）；PR [#13](https://github.com/alphaqwqwq/fleet-campaign/pull/13) 于 2026-08-11 创建，base 为 `main`，状态 OPEN 且 mergeable。最终头 CI verify [SUCCESS](https://github.com/alphaqwqwq/fleet-campaign/actions/runs/31471802203/job/93716538294)，Vercel deployment [SUCCESS](https://fleet-campaign-76ah4429q-alphaqwqwq114514.vercel.app)。本 Exec 不改变发布入口，正式入口验收不属于本 Exec。
+- 提交 / PR / CI / Preview：实现提交 `1b3a775`，结果记录提交 `c342cfe`、`21008a3`、`9d71e86`、`c787a95`，均基于 `eb0e499` 并已推送 `feature/exec-002-03-host-authoritative-realtime`；专用短提示词曾由 `e64c0e7` 恢复，现随 Workflow V2 合并淘汰。PR [#13](https://github.com/alphaqwqwq/fleet-campaign/pull/13) 于 2026-08-11 创建，base 为 `main`，状态 OPEN 且 mergeable。`c787a95` 的 verify、Vercel 与 Preview Comments 均成功。本 Exec 不改变发布入口，正式入口验收不属于本 Exec。
 - 自动化与人工联机验收：真实浏览器、公共信令建连与主观联机体验未在本环境执行，按 Plan 汇入父 Plan Gate；无网络替身与本地门禁成功不替代真实结论。
 - 遗留风险与对父 Plan 验收的影响：`sessionTokenFingerprint` 为确定性非加密摘要，作用仅为避免房主内存保留明文令牌，令牌熵为 256-bit 使预像不可行；未来若需密码学 verifier 应改 SHA-256。浏览器会话存储保留令牌与 `clientId` 的恢复接线、真实 PeerJS 建连与公共信令可达性留待 EXEC-002-04/05。观战者出现在公开 roster 中席位记为 `guest`（v1 schema 仅允许 host/guest 席位），语义待网页验收确认。
+- Review 补救状态：REVIEW-002-03 要求显式 leave 撤销 token、移除 realtime→domain 依赖，并补终局双事件广播断言；以上证据均早于补救，修复后必须重跑固定门禁。当前不满足合并或 EXEC-002-04 准入。

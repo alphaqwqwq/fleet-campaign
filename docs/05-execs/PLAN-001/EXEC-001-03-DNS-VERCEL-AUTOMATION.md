@@ -42,7 +42,7 @@
 
 - `scripts/Invoke-VercelFleetCnameDns.ps1`：仅管理 `alphaqwq.xyz` 下 `fleet` 的默认线路 CNAME，默认 dry-run，显式 apply 才调用写 API。
 - `docs/05-execs/PLAN-001/EXEC-001-03-DNS-VERCEL-AUTOMATION.md`：记录无密钥的执行证据、结果与回滚步骤。
-- `docs/08-prompts/development/EXEC-001-03-DNS-VERCEL-AUTOMATION-SHORT-PROMPT.md` 与 `docs/08-prompts/README.md`：本 Exec 对话定位。
+- `docs/08-prompts/development/EXEC.md` 与 `docs/08-prompts/README.md`：通用 Exec 对话入口；目标边界仍以本文档为准。
 
 ## 前置条件
 
