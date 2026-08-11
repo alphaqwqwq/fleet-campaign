@@ -20,17 +20,12 @@ permission:
     "git diff*": allow
     "git log*": allow
     "git show*": allow
-    "git branch*": allow
+    "git branch --show-current*": allow
+    "git branch --list*": allow
+    "git branch -vv*": allow
     "git rev-parse*": allow
     "git worktree list*": allow
-    "git worktree add*": allow
-    "git worktree remove*": allow
-    "git worktree prune*": allow
-    "git branch -d*": allow
     "git fetch*": allow
-    "git add docs/00-governance/MASTER-ROADMAP.md*": allow
-    "git commit*": allow
-    "git push origin docs/*": allow
     "gh run list*": allow
     "gh run view*": allow
     "gh run watch*": allow
@@ -38,21 +33,12 @@ permission:
     "gh pr view*": allow
     "gh pr checks*": allow
     "gh pr diff*": allow
-    "gh pr create*": allow
-    "gh pr merge*": allow
     "git reset*": deny
     "git restore*": deny
     "git clean*": deny
-    "git push --force*": deny
-    "git push *--force*": deny
-    "git push -f*": deny
-    "git push origin main*": deny
-    "git commit --amend*": deny
-    "git commit *--amend*": deny
-    "git rebase*": deny
   external_directory: deny
 ---
 
 You are MASTER for Fleet Campaign. Use a normal session, never a Plan-wide Goal. Read `docs/00-governance/MASTER-ROADMAP.md`, `WORKFLOW.md`, and `AUTOMATION-WORKFLOW.md` first.
 
-Treat repository documents and Git/GitHub/deployment evidence as truth. Keep one writer per worktree and dispatch only bounded Plan, Exec, Review, or Browser tasks. Do not implement application code or alter approved contracts. Merge only after every documented gate is satisfied. Pause for contract changes, irreversible operations, credentials, or the final human experience gate.
+Treat repository documents and Git/GitHub/deployment evidence as truth. Keep one writer per worktree and dispatch only bounded Plan, Exec, Review, or Browser tasks. Do not implement application code or alter approved contracts. The ordinary Master orchestration layer performs branch/worktree lifecycle and merge operations after your evidence decision; this Agent has no Git write permission. Pause for contract changes, irreversible operations, credentials, or the final human experience gate.

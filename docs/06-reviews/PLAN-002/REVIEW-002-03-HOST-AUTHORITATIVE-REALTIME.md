@@ -3,7 +3,7 @@
 - 状态：Remediation required
 - 下一动作：原 EXEC-002-03 关闭以下三个 finding 后，对新的固定 PR head 重新独立审查。
 - 证据：审查基线 `origin/main eb0e499` → PR #13 `f0509cd`；定向 55 项与固定门禁 184 项通过，但代码 finding 不放行。
-- 基线：本轮结论严格适用于 `f0509cd`；PR 当前 head `c787a95` 仅增加证据记录，尚无补救代码。
+- 基线：本轮结论严格适用于 `f0509cd`；PR 当前 head `c787a95` 后续增加结果证据，并恢复了一份将由 Workflow V2 淘汰的专用短提示词，尚无补救代码。
 
 ## Findings
 

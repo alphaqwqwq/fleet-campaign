@@ -1,6 +1,6 @@
 # GOV-002-02：Workflow V2 治理审查
 
-- 状态：Remediation in progress
+- 状态：Second remediation in progress
 - 下一动作：对修复后的 PR #14 新 head 重新执行独立审查。
 - 证据：首轮冻结 head `ffe32b9`；独立审查结论 `remediation required`。
 - 基线：`origin/main eb0e499` → PR #14 `ffe32b9`。
@@ -23,3 +23,9 @@
 - 局部 Review finding 先回原 Exec 修复；只有真实修复失败或复杂/契约问题才升级 Terra。
 - 将全部开发会话入口收敛为五个通用角色模板，并清除稳定目标文档的专用短提示词引用。
 - 新增 `npm run verify:governance` 并接入 CI，检查相对链接、危险 Agent 权限和专用 prompt 引用。
+
+## 第二轮 Findings 与补救
+
+- 复审发现 raw `git add/push` 可追加路径/refspec，Master 的 branch/remove 模式也难以安全表达前置核验；最终取消所有角色 Agent 的 Git 写权限，由普通 Master 编排层在释放租约后集中执行提交、报告入库、推送、合并和安全回收。
+- 治理门禁改为枚举 `docs/08-prompts/development`，只允许五个角色模板；PR #13 的专用 prompt 必须在补救时删除。
+- REVIEW-002-03 已准确记录 `f0509cd..c787a95` 恢复专用 prompt 的事实。

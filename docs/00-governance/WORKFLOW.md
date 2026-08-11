@@ -29,7 +29,7 @@
 
 - 只根据路线图、目标文档、Git、PR、CI、部署和用户决定更新状态。
 - 使用普通会话调度有界子任务；Master 本身不使用覆盖整个 Plan 的 Goal Mode。
-- 只有依赖、固定门禁、独立 Review `pass`、PR checks 和结果记录均满足后，Master 才执行合并。
+- 角色 Agent 释放单写者租约后，普通 Master 编排层集中执行提交、推送、PR、Review 报告入库和安全回收；只有依赖、固定门禁、独立 Review `pass`、PR checks 和结果记录均满足后才合并。
 - 发生契约变化、不可逆外部操作、凭据边界或最终人工体验 Gate 时暂停并请求用户。
 
 ## Plan 的职责

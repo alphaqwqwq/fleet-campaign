@@ -13,7 +13,7 @@
 ## 单写者租约
 
 - 任一 worktree 同一时刻只有一个写者。路线图活动表记录会话、worktree、分支、PR/head 和下一动作。
-- Master 不与 Exec 并发编辑功能 worktree。Review 从固定 PR head 建 detached worktree，只审不修；Review 只可将 `docs/06-reviews/**` 报告作为新提交快进到被审 feature PR，使结论进入 Git 真源。
+- Master 不与 Exec 并发编辑功能 worktree。Review 从固定 PR head 建 detached worktree，只审不修，只写指定 `docs/06-reviews/**` 报告。Review 释放租约后，普通 Master 将报告原样复制到 feature PR并提交，使结论进入 Git 真源；不创建证据收尾会话。
 - 子会话 idle 且无新增证据时释放租约；状态不明时先检查 Git，不重复发送消息制造并发。
 
 ## Goal Mode
@@ -40,8 +40,8 @@
 
 ## 权限与合并
 
-- fleet Agent 的 bash 采用 broad deny 后精确 allow；白名单外命令 fail-fast，禁止 `ask` 静默挂起。角色 Agent 禁止通用 `node*`、`gh api*` 和子 Agent 调度等可绕过职责边界的入口。
-- Exec 不合并自己的 PR。Master 仅在依赖、固定门禁、独立 Review `pass`、PR checks、结果记录和契约边界全部满足后合并。
+- fleet Agent 的 bash 采用 broad deny 后精确 allow；白名单外命令 fail-fast，禁止 `ask` 静默挂起。角色 Agent 禁止通用 `node*`、`gh api*`、Git 写操作和子 Agent 调度等可绕过职责边界的入口。普通 Master 编排层在释放角色租约后集中执行提交、推送、PR、合并与安全回收。
+- Exec/Review Agent 不执行 Git 写操作。普通 Master 编排层仅在依赖、固定门禁、独立 Review `pass`、PR checks、结果记录和契约边界全部满足后合并。
 - 合并后记录 merge commit 与 `main` CI；回滚使用 `git revert` 和独立 PR，不改写历史。
 
 ## Master 轮换

@@ -41,6 +41,17 @@ for (const file of files.filter((file) => portable(file).startsWith("docs/04-pla
   if (content.includes("对应短提示词")) failures.push(`${file}: references a per-target short prompt`);
 }
 
+const promptDirectory = "docs/08-prompts/development";
+const allowedPrompts = new Set(["BROWSER.md", "EXEC.md", "MASTER.md", "PLAN.md", "REVIEW.md"]);
+for (const entry of readdirSync(promptDirectory, { withFileTypes: true })) {
+  if (!entry.isFile() || !allowedPrompts.has(entry.name)) {
+    failures.push(`${promptDirectory}: unexpected per-target prompt asset ${entry.name}`);
+  }
+}
+for (const prompt of allowedPrompts) {
+  if (!existsSync(join(promptDirectory, prompt))) failures.push(`${promptDirectory}: missing role template ${prompt}`);
+}
+
 if (failures.length) {
   console.error(failures.join("\n"));
   process.exit(1);
