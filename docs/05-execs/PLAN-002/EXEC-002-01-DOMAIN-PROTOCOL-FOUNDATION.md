@@ -65,3 +65,13 @@
 - 固定门禁：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（6 文件 66 用例）、`npm run build` 全部通过，本地 2026-08-10 与 PR CI verify 双验证。
 - 实现会话静态自查（非用户人工验收、非独立 Review）：记录称 `packages/domain` 仅依赖 `@fleet-campaign/content`，公开示例使用 `demo-v1` 抽象内容，协议不含令牌值或客户端结论字段；该结论须由 REVIEW-002-01 以代码和 Git/CI 证据独立校正。
 - 遗留风险与对父 Plan 验收的影响：会话账本与协议信封的无副作用数据结构已就绪，但其宿主组合（房主应用服务）属于 `apps/web`，由 EXEC-002-03/04 接线；协议 v1 对外字段、随机消费点、状态机、不变量或跨包依赖的任何未裁决变化需按 PLAN-002-01 触发 Review/ADR 并停止本阶段。
+
+## 补救结果（REVIEW-002-01 remediation）
+
+- 补救分支：`feature/exec-002-01-protocol-schema-remediation`（基于 `origin/main` `ef1f5b1` 创建）。本次仅修复 REVIEW-002-01 的两项 High finding，不改动协议 v1 对外字段、事件类型或幂等语义。
+- 根因与修复：
+  1. `ids.ts` 的 `isValidIdempotencyKey` 接受任意 1-32 字符 URL-safe 字符串，单字符键也通过，削弱跨重试幂等键的碰撞边界。现与 Plan 已批准的 URL-safe 128-bit 表示一致：要求无填充 base64url 编码 16 字节所需的最短 22 字符且最长不超过 32 字符，拒绝过短/过长键；`validate.ts` 中两处错误信息同步更新。
+  2. `validate.ts` 的 `Snapshot.game` 未拒绝未知字段、`BroadcastEvent.publicPayload` 无约束。现对 v1 游戏投影整体与每个 `units` 条目施加精确 schema：`game` 与 `unit` 均拒绝未知字段，`unit.id` 只允许 `host-unit`/`guest-unit`；按事件类型建立公开载荷 schema（`demo-started: {round, activeSeat}`、`action-confirmed: {targetSeat, targetIntegrity}`、`demo-completed: {winnerSeat}`、`room-closed: {}`），未知字段一律拒绝，token 无法经 v1 校验进入下行快照/公开事件。未新增运行时依赖。
+- 测试：先改/新增失败测试（短键、单字符键、非法长度边界；publicPayload 未知字段/缺字段/非法值/room-closed 空载荷；game 与 unit 未知字段、未知 unit id），再最小实现。`packages/protocol/src/validate.test.ts` 由 35 增至 46 用例。
+- 固定门禁（2026-08-11 本地）：`npm ci`、`npm run typecheck`、`npm run lint`、`npm run test`（6 文件 79 用例）、`npm run build` 全部通过；提交、PR CI 与 Vercel Check 见本文件上方 Git/PR 记录。
+- 遗留风险：仍待 EXEC-002-03/04 宿主组合产生真实广播事件与快照后，以端到端证据复核公开载荷与 `projectGame` 映射；`room-closed` 公开载荷定为空对象，若未来需要携带展示字段须先经 Plan/ADR 裁决。
