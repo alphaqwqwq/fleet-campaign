@@ -16,6 +16,8 @@
 
 ## 常用执行手册
 
+- [Master 路线图与活动控制台](00-governance/MASTER-ROADMAP.md)：当前阶段、唯一写者、PR/head 和下一动作。
+- [自动化工作流 V2](00-governance/AUTOMATION-WORKFLOW.md)：短目标会话、Goal、资产预算、模型升级与回收纪律。
 - [网页发布 CI/CD 全流程经验手册](00-governance/RELEASE-CICD-PLAYBOOK.md)：网页发布的标准门禁、发布链路、多网络验收矩阵与已踩坑经验；每个大阶段在本地验证完成后必须实际投放网页并做多人在线验证。
 
 ## 文档优先级
