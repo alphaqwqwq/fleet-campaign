@@ -20,7 +20,7 @@ export function JoinRoom({ onExit }: { onExit: () => void }) {
   const [roomCode, setRoomCode] = useState('')
   const [role, setRole] = useState<RequestedRole>('player')
   const [joined, setJoined] = useState(false)
-  const [, setTick] = useState(0)
+  const [tick, setTick] = useState(0)
   const [events, setEvents] = useState<string[]>([])
   const sessionRef = useRef<ReturnType<typeof createClientSession> | null>(null)
   const lastEventSequence = useRef(-1)
@@ -30,6 +30,18 @@ export function JoinRoom({ onExit }: { onExit: () => void }) {
       sessionRef.current?.close()
     }
   }, [])
+
+  // 会话终态（房主关闭 / 身份被拒）→ 清掉陈旧令牌并回到加入表单，允许干净重试。
+  useEffect(() => {
+    if (!joined) return
+    const current = sessionRef.current?.view
+    if (!current || current.status !== 'closed') return
+    clearResumeToken(roomCode.trim())
+    sessionRef.current?.close()
+    sessionRef.current = null
+    setJoined(false)
+    setEvents([])
+  }, [tick, joined, roomCode])
 
   function join(): void {
     const code = roomCode.trim()

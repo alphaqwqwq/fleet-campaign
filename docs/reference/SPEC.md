@@ -46,7 +46,7 @@
 - 传输抽象 `HostTransport` / `ClientTransport` + 帧校验；默认 **Vercel 轮询中继**（ADR-005：同源 `/api/relay` 函数 + KV，HTTP 轮询，无 WebSocket/NAT/外部信令依赖），`MemoryHostTransport` 为无网络测试替身，PeerJS 适配为 `?transport=peerjs` 备选。
 - 中继只存转发帧、不解析不裁决（房主仍是唯一权威）；每房间追加式日志 + 游标轮询，默认 500ms。
 - 建连：房主建端点 → 加入者请求 `player | spectator` → 房主签发令牌绑定角色 → 下发完整快照 → 后续只走 `command-intent` / `command-result`。
-- 重连 = 同一 `clientId` + 仍有效令牌重建立传输，下发完整快照；令牌失效/房主关闭视为新加入/会话结束。
+- 重连 / 返回 = 同一 `clientId` 重新加入（可无令牌）：房主角色锁定、重绑连接并**换发新令牌**；只有房主无该 clientId 绑定（房主重启 / 新房间）时才视为令牌失效 → 按新加入处理。房主关闭视为会话结束。
 - 重复连接：以最后通过令牌校验的连接为有效，旧连接收到 `duplicate_connection`。
 - 观战：收同玩家公开快照与事件，但协议与应用服务拒绝其任何改变状态命令（`forbidden_role`）。
 - 房主关闭：广播 `room-closed`（可用时）并销毁端点；提供"保存后新建房间"降级，无房主迁移。

@@ -175,7 +175,10 @@ export class HostSessionController {
     if (frame.roomId !== this.roomId) { this.sendJoinRejected(connectionId, frame.clientId, 'room_not_found'); return }
     const old = this.bindings.get(frame.clientId)
     if (old) {
-      if (old.role !== frame.requestedRole || frame.token === undefined || old.tokenFingerprint !== sessionTokenFingerprint(frame.token)) {
+      // 同一 clientId 返回：角色锁定，重新绑定连接并换发新令牌。
+      // （ADR-001：临时令牌只降低误操作与角色混淆，不构成安全保证；
+      //  relay 下连接可静默失效，令牌不得成为重连死结。）
+      if (old.role !== frame.requestedRole) {
         this.sendJoinRejected(connectionId, frame.clientId, 'identity_invalid')
         return
       }
@@ -184,7 +187,9 @@ export class HostSessionController {
         this.options.hostTransport.closeClient(old.connectionId)
       }
       old.connectionId = connectionId
-      this.options.hostTransport.sendTo(connectionId, { frame: 'join-accepted', protocolVersion: 1, messageId: 'join-accepted', roomId: this.roomId, clientId: frame.clientId, token: frame.token, role: old.role, seat: old.seat })
+      const reissuedToken = generateSessionToken()
+      old.tokenFingerprint = sessionTokenFingerprint(reissuedToken)
+      this.options.hostTransport.sendTo(connectionId, { frame: 'join-accepted', protocolVersion: 1, messageId: 'join-accepted', roomId: this.roomId, clientId: frame.clientId, token: reissuedToken, role: old.role, seat: old.seat })
       this.sendSnapshot(connectionId, old)
       return
     }
