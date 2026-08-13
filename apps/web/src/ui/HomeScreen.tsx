@@ -1,6 +1,6 @@
 import { useI18n } from '../i18n'
 
-export type HomeAction = 'host' | 'join' | 'demo'
+export type HomeAction = 'host' | 'join' | 'demo' | 'battle'
 
 export function HomeScreen({ onSelect }: { onSelect: (action: HomeAction) => void }) {
   const { t } = useI18n()
@@ -9,6 +9,9 @@ export function HomeScreen({ onSelect }: { onSelect: (action: HomeAction) => voi
       <h1>{t('app.title')}</h1>
       <p className="tagline">{t('app.tagline')}</p>
       <div className="home-actions">
+        <button className="primary" onClick={() => onSelect('battle')}>
+          {t('home.battle')}
+        </button>
         <button className="primary" onClick={() => onSelect('host')}>
           {t('home.createRoom')}
         </button>
@@ -19,6 +22,7 @@ export function HomeScreen({ onSelect }: { onSelect: (action: HomeAction) => voi
           {t('home.demo')}
         </button>
       </div>
+      <p className="muted hint">{t('home.battleHint')}</p>
       <p className="muted hint">{t('home.demoHint')}</p>
     </section>
   )
