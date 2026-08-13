@@ -2,6 +2,7 @@
 
 - 状态：基线（2026-08-13 设计讨论固化，实现前可修订）
 - 范围：M2（demo-v1 舰队战斗引擎 → 单指挥可玩战役循环）
+- 领域命令/事件 schema 草案（M2-A 实现基线）：[DESIGN-M2-SCHEMA.md](DESIGN-M2-SCHEMA.md)
 - UI 与星系背景基线（已定稿）：[DESIGN-M2-UI.md](DESIGN-M2-UI.md)
 - 规则来源：`D:\workspace\deckgame\reference\01-source-books\《枪骑兵：战斗群》v1.1.6.txt`（229 页全量提取，含页标记）；战役模组《暮锤行动》。原作材料不进公开仓库（R-004），仓库内一律自创/抽象名。
 

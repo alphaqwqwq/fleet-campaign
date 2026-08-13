@@ -1,0 +1,16 @@
+{
+  "name": "@fleet-campaign/battle",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fleet-campaign/content": "0.0.0",
+    "@fleet-campaign/domain": "0.0.0"
+  }
+}

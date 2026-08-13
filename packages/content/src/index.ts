@@ -1,3 +1,6 @@
 export * from './types'
 export * from './validate'
+export * from './battle-types'
+export * from './battle-validate'
 export { DEMO_V1_CONTENT } from './demo-v1'
+export { BATTLE_SANDBOX_V1 } from './battle-sandbox'
