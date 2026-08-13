@@ -1,22 +1,21 @@
 # Fleet Campaign
 
-Fleet Campaign 是一个正在建立工程基线的网页联机电子桌游项目。
+Fleet Campaign 是一个网页联机电子桌游项目：网页 + 临时房主联机 + 电子化游戏 + 可降级 LLM 叙事。
 
-当前页面仅用于确认 React、TypeScript、Vite、npm workspaces、测试、CI 与静态部署链路可用，不包含游戏规则、联机、存档或模型调用。
+领域规则、协议、本地存档与实时传输已具备 demo-v1 技术骨架；网页垂直切片（建房/加入/对局/存档 UI）为下一个 feature。
 
 ## 工作区
 
 ```text
-apps/web                 React/Vite 静态网页
-packages/domain          未来的纯规则边界
-packages/protocol        未来的命令与事件协议边界
-packages/persistence     未来的本地持久化边界
-packages/realtime        未来的实时通信边界
-packages/narration       未来的叙事 Hook 边界
-packages/content         未来的自写内容边界
+apps/web                 React/Vite 网页 + 组合层（host/client session 编排）
+packages/domain          demo-v1 纯规则（reducer/ledger/rng）
+packages/protocol        protocol v1 信封/命令/快照/错误码
+packages/persistence     本地存档 v1 + 导入导出/迁移
+packages/realtime        可替换实时传输（PeerJS 适配 + 内存替身）
+packages/content         demo-v1 内容模板
 ```
 
-这些 package 目前只定义工程边界，不提供业务 API。
+架构与边界见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，现行产品契约见 [docs/reference/SPEC.md](docs/reference/SPEC.md)。
 
 ## 开发与验证
 
