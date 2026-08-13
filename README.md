@@ -14,8 +14,10 @@ packages/battle          M2-A 交战引擎（纯规则、确定性可复现；�
 packages/protocol        protocol v1 信封/命令/快照/错误码
 packages/persistence     本地存档 v1 + 导入导出/迁移（存档 v2 见 ADR-006）
 packages/realtime        可替换实时传输（PeerJS 适配 + 内存替身）
-packages/content         demo-v1 内容模板 + M2 交战内容 schema/沙盒夹具
+packages/content         demo-v1 内容模板 + M2 交战内容 schema/沙盒夹具/精选目录/20 点构筑器
 ```
+
+- `npm run battle:sim`：M2-A 控制台交战沙盒（固定种子跑整场交战并打印骰子/事件/战果）。
 
 架构与边界见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，现行产品契约见 [docs/reference/SPEC.md](docs/reference/SPEC.md)。
 

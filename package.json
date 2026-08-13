@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "verify:governance": "node scripts/verify-governance.mjs",
+    "battle:sim": "npm run sim --workspace @fleet-campaign/battle",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p api",
     "lint": "eslint .",
     "test": "vitest run",

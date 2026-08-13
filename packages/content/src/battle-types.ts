@@ -23,6 +23,8 @@ export interface BattleWeaponTemplate {
   area?: boolean
   /** 会心标签：命中骰 20+ 时伤害翻倍。 */
   crit?: boolean
+  /** 构筑点数（point-buy 消耗）；缺省 0。引擎不消费。 */
+  points?: number
 }
 
 export interface BattleShipTemplate {
@@ -35,6 +37,8 @@ export interface BattleShipTemplate {
   blockBonus?: number
   /** 旗舰：+3 HP / +1 阻滞骰 / +1 系统槽（v1 简化记于内容）。 */
   flag?: boolean
+  /** 构筑点数（point-buy 消耗）。引擎不消费。 */
+  points?: number
 }
 
 export interface BattleGroupTemplate {
