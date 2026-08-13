@@ -28,6 +28,10 @@ npm run test
 npm run build
 ```
 
+## 开发流程
+
+单轨 git 驱动工作流见 [docs/WORKFLOW.md](docs/WORKFLOW.md)：feature 分支 + PR + CI，跨契约变更先写 [docs/decisions](docs/decisions) 的 ADR。
+
 ## 资料与兼容性
 
 - 旧 `fleet-room` 原型的存档与本项目不兼容。
