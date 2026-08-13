@@ -8,3 +8,5 @@ export { reduceCommand, startEngagement, computeOutcome, applyCollapse, markElim
 export type { ReduceResult } from './reducer'
 export { buildSimContent, defaultFleets, formatSimulation, runSimulation } from './sim'
 export type { SimOptions } from './sim'
+export { deriveBotState, decideBotCommands, dominantArchetype, botWantsToRetreat, RETREAT_HP_RATIO, ARCHETYPE_LABEL } from './bot'
+export type { BotArchetype, BotPhase, DerivedBotState } from './bot'
