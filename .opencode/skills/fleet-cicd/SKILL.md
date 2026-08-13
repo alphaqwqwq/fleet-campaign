@@ -55,6 +55,7 @@ PR 与 `main` 推送由 GitHub Actions 跑同一套；本地先跑通，以 Acti
 - 验证：`https://fleet.alphaqwq.xyz/api/relay?room=12345&op=host-poll` → `{"records":[],"cursor":0}`。
 - 部署后前端强制刷新（Ctrl+Shift+R / 手机清缓存）。
 - 房间码 5 位数字；中继 host-open 做占据检查 + 清旧日志，host-close/1h TTL 释放。
+- **轮询防并发**：慢网络下 poll 可能重叠 → 同一帧重复投递（"一次操作反复播报"）。`relay.ts` 的 `startPollLoop` 有 `inFlight` 守卫；改轮询必须保留守卫并跑慢网络回归测试。
 - 备选：`?transport=peerjs`（依赖外部信令，国内不可靠，仅调试）。
 
 ## 依据

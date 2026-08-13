@@ -52,6 +52,16 @@
 - 房主关闭：广播 `room-closed`（可用时）并销毁端点；提供"保存后新建房间"降级，无房主迁移。
 - 时序一致性：房主单写者 + `eventSequence` 全序 + `expectedEventSequence` 乐观并发 + 幂等键；轮询只增加传播延迟（亚秒级），不引入冲突。
 
+### 传输一致性约束（未来扩展时强制检查）
+
+新增更复杂的功能、命令或更大的传输包体时，必须保持以下不变量，否则回 ADR/Plan：
+
+1. **轮询游标单调**：`startPollLoop` 的 `inFlight` 防并发守卫不可移除——慢网络下并发 poll 会重复投递同一帧（已复现："一次操作反复播报"）。改轮询必须保留守卫 + 跑慢网络回归测试。
+2. **中继保持不透明**：中继只存转发帧、不解析内容。新帧类型只改 `packages/realtime` 的 frames schema + `validateInboundFrame`/`validateOutboundFrame`，中继代码不动。
+3. **新命令/事件必须过 schema + 账本**：新命令类型进 `validateCommandIntent` 与领域 reducer；新事件进 `validateBroadcastEvent` 的 `PUBLIC_PAYLOAD_FIELDS`；`eventSequence` 严格递增、幂等收据、`expectedEventSequence` 检查全部保留。
+4. **帧体保持有界**：快照/事件随玩法增长会变大。当前规模无碍；若包体显著增大，须在中继 handler 加帧大小上限（拒绝超限帧），避免 Redis 与轮询响应膨胀。
+5. **两端视图一致**：双方事件记录必须从广播事件流构建（host 用 `getView().lastEvent`、guest 用 `view.lastBroadcast`），按 `eventSequence` 去重；不得只显示自己的动作。
+
 ## 叙事边界
 
 - 首版无旁白运行时（`packages/narration` 未实现，不占 workspace）。
