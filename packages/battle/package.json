@@ -7,7 +7,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sim": "vitest run src/sim-runner.test.ts --disableConsoleIntercept"
   },
   "dependencies": {
     "@fleet-campaign/content": "0.0.0",

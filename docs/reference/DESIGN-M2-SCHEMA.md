@@ -166,6 +166,13 @@ Weapon:    { id, size: secondary/main/superheavy, tags: [charge:N|payload:N|relo
 
 沙盒夹具 `battle-sandbox-v1`（M2-A 测试用，纯自创抽象名）随引擎同仓提供。
 
+### M2-B 内容与构筑（本轮实现）
+
+- 精选目录 `packages/content/src/battle-catalog.ts`：船体（巡防/航母/战列）+ 武器（副/主/超重型）自创抽象名，每项带 `points`。
+- 20 点构筑器 `buildBattleContent`：选目录船体/武器 → 校验（恰好 1 旗舰、≥2 主力舰、舰型上限 巡防≤3/航母≤2/战列≤1、总点 ≤20）→ 产出引擎可消费的 `BattleContent`。
+- 旗舰加成在构筑层应用：+3 HP / +1 阻滞骰 / +1 系统槽。
+- 人工验证：`npm run battle:sim` 控制台沙盒，固定种子跑整场交战并批量打印阶段/骰子/事件/战果（确定性可复现）。
+
 ## 9. 验收（M2-A 完成定义）
 
 1. `start-engagement` → `advance-phase` 全轮次（logistics→ballistics→action→boarding→round+1）可确定性走通。
