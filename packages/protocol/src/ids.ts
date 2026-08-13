@@ -5,7 +5,7 @@ export function isValidMessageId(value: unknown): value is string {
 }
 
 export function isValidRoomId(value: unknown): value is string {
-  return typeof value === 'string' && /^r_[A-Za-z0-9_-]{12}$/.test(value)
+  return typeof value === 'string' && /^\d{5}$/.test(value)
 }
 
 export function isValidCampaignId(value: unknown): value is string {

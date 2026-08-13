@@ -411,7 +411,7 @@ describe('createHostSession', () => {
       command: 'start-demo',
       idempotencyKey: 'g'.repeat(22),
       expectedEventSequence: 0,
-      intentRoomId: 'r_ZZZZZZZZZZZZ',
+        intentRoomId: '99999',
     })
     const result = frames.find((f) => f.frame === 'command-result')
     expect(result && 'result' in result && result.result.accepted).toBe(false)

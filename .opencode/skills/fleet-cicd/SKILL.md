@@ -47,6 +47,16 @@ PR 与 `main` 推送由 GitHub Actions 跑同一套；本地先跑通，以 Acti
 - Vercel 回滚优先切换既有成功部署。
 - 止损：CI / Vercel 构建 / DNS / HTTPS / 浏览器 / 多人在线验收任一失败 → 停、留证据、请用户决策；同一诊断两次无可信结论不再重复写。
 
+## 中继部署与验证（ADR-005）
+
+- 联机默认走同源 `/api/relay`；依赖 Vercel 官方 Redis（`REDIS_URL`，`redis://` 形式），**不是** `KV_REST_API_*`（`@vercel/kv` 不适用）。
+- **函数必须自包含**：`api/relay.ts` 已内联 handler；跨目录 `../packages/...` 导入 → Vercel 打包器追踪不到 → `FUNCTION_INVOCATION_FAILED`。改 handler 需同步 `packages/realtime/src/relay-handler.ts`。
+- 连接数据库时勾 Production + Preview，Custom Prefix 留空。
+- 验证：`https://fleet.alphaqwq.xyz/api/relay?room=12345&op=host-poll` → `{"records":[],"cursor":0}`。
+- 部署后前端强制刷新（Ctrl+Shift+R / 手机清缓存）。
+- 房间码 5 位数字；中继 host-open 做占据检查 + 清旧日志，host-close/1h TTL 释放。
+- 备选：`?transport=peerjs`（依赖外部信令，国内不可靠，仅调试）。
+
 ## 依据
 
 - 详细矩阵、全部实测坑与证据：`docs/reference/PLAYBOOK-CICD.md`

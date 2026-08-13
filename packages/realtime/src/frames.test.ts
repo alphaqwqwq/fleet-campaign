@@ -4,7 +4,7 @@ import type { CommandIntentFrame, JoinRequestFrame, LeaveRequestFrame } from './
 import { validateInboundFrame, validateOutboundFrame } from './frames-validate'
 import { generateSessionToken } from './token'
 
-const ROOM = 'r_AbCdEfGh1234'
+const ROOM = '12345'
 const CLIENT = 'u_12345678-1234-4234-8234-123456789abc'
 
 function joinRequest(overrides: Partial<JoinRequestFrame> = {}): JoinRequestFrame {
@@ -86,7 +86,7 @@ describe('validateInboundFrame', () => {
   })
 
   it('rejects a bad roomId', () => {
-    const result = validateInboundFrame(joinRequest({ roomId: 'r_short' }))
+    const result = validateInboundFrame(joinRequest({ roomId: '123' }))
     expect(result.ok).toBe(false)
   })
 

@@ -14,7 +14,7 @@ import {
 } from './index'
 import type { CommandIntent } from './index'
 
-const ROOM_ID = 'r_abcdEFGHij12'
+const ROOM_ID = '12345'
 const CLIENT_ID = 'u_12345678-1234-1234-1234-123456789abc'
 const CAMPAIGN_ID = 'c_12345678-1234-1234-1234-123456789abc'
 const MESSAGE_ID = 'm_001'

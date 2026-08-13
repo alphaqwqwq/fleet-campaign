@@ -12,6 +12,8 @@ export interface RelayStore {
   range(roomId: string, from: number, to: number): Promise<unknown[]>
   /** 当前日志长度。 */
   len(roomId: string): Promise<number>
+  /** 清空该房间日志（释放房间码）。 */
+  clear(roomId: string): Promise<void>
 }
 
 export interface RelayRequest {
@@ -51,6 +53,9 @@ export function createMemoryRelayStore(): RelayStore {
     async len(roomId): Promise<number> {
       return (logs.get(roomId) ?? []).length
     },
+    async clear(roomId): Promise<void> {
+      logs.delete(roomId)
+    },
   }
 }
 
@@ -61,9 +66,24 @@ export async function handleRelayRequest(request: RelayRequest, store: RelayStor
   if (request.method === 'POST') {
     const body = isRecord(request.body) ? request.body : {}
     switch (op) {
-      case 'host-open':
+      case 'host-open': {
+        // 占据检查：存在未被 host-close 结束的 host-open 即视为房间占用。
+        const total = await store.len(roomId)
+        const existing = await store.range(roomId, 0, total - 1)
+        let lastOpen = -1
+        let lastClose = -1
+        existing.forEach((record, index) => {
+          if (isRecord(record)) {
+            if (record.kind === 'host-open') lastOpen = index
+            else if (record.kind === 'host-close') lastClose = index
+          }
+        })
+        if (lastOpen > lastClose) return { status: 409, body: { error: 'room_occupied' } }
+        // 复用房间码：清空旧日志，避免新房间继承上一场残留帧。
+        await store.clear(roomId)
         await store.append(roomId, { kind: 'host-open' })
         return { status: 200, body: { ok: true } }
+      }
       case 'host-send': {
         const frame = body.frame
         if (!isRecord(frame)) return { status: 400, body: { error: 'frame required' } }

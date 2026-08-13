@@ -36,6 +36,7 @@ interface RelayStore {
   append(roomId: string, record: unknown): Promise<number>
   range(roomId: string, from: number, to: number): Promise<unknown[]>
   len(roomId: string): Promise<number>
+  clear(roomId: string): Promise<void>
 }
 
 const store: RelayStore = {
@@ -57,6 +58,9 @@ const store: RelayStore = {
   },
   async len(roomId): Promise<number> {
     return run(async (client) => client.lLen(ROOM_KEY_PREFIX + roomId))
+  },
+  async clear(roomId): Promise<void> {
+    await run(async (client) => client.del(ROOM_KEY_PREFIX + roomId))
   },
 }
 
@@ -83,9 +87,22 @@ async function handleRelayRequest(request: RelayRequest, relayStore: RelayStore)
   if (request.method === 'POST') {
     const body = isRecord(request.body) ? request.body : {}
     switch (op) {
-      case 'host-open':
+      case 'host-open': {
+        const total = await relayStore.len(roomId)
+        const existing = await relayStore.range(roomId, 0, total - 1)
+        let lastOpen = -1
+        let lastClose = -1
+        existing.forEach((record, index) => {
+          if (isRecord(record)) {
+            if (record.kind === 'host-open') lastOpen = index
+            else if (record.kind === 'host-close') lastClose = index
+          }
+        })
+        if (lastOpen > lastClose) return { status: 409, body: { error: 'room_occupied' } }
+        await relayStore.clear(roomId)
         await relayStore.append(roomId, { kind: 'host-open' })
         return { status: 200, body: { ok: true } }
+      }
       case 'host-send': {
         const frame = body.frame
         if (!isRecord(frame)) return { status: 400, body: { error: 'frame required' } }
