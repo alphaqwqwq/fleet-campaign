@@ -488,14 +488,14 @@ describe('createHostSession', () => {
 
     const second = h.join(playerId, 'player', null, firstAccepted.token)
     const secondAccepted = h.acceptedFor(second)
-    expect(secondAccepted.token).toBe(firstAccepted.token)
+    expect(secondAccepted.token).not.toBe(firstAccepted.token)
 
     expect(first.client.status).toBe('duplicate_connection')
     expect(first.frames.some((f) => f.frame === 'duplicate-connection')).toBe(true)
 
-    // A valid reconnect keeps the token, but role authorization remains enforced.
+    // 重连换发新令牌，旧令牌失效；角色授权仍然强制。
     const frames = h.sendIntent(second, {
-      token: firstAccepted.token,
+      token: secondAccepted.token,
       command: 'start-demo',
       idempotencyKey: 'j'.repeat(22),
       expectedEventSequence: 0,
@@ -543,7 +543,7 @@ describe('createHostSession', () => {
     const droppedAccepted = h.acceptedFor(dropped)
     dropped.client.close()
     const reconnected = h.join(droppedAccepted.clientId, 'player', null, droppedAccepted.token)
-    expect(h.acceptedFor(reconnected).token).toBe(droppedAccepted.token)
+    expect(h.acceptedFor(reconnected).token).not.toBe(droppedAccepted.token)
   })
 
   it('broadcasts room-closed and ends the endpoint on closeRoom', () => {
