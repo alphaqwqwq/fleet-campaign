@@ -166,4 +166,34 @@ describe('relay polling transport', () => {
     await waitFor(() => host3.status === 'open', 'code freed and reopened')
     host3.close()
   })
+
+  it('delivers each frame exactly once even under slow (overlapping) polls', async () => {
+    const store = createMemoryRelayStore()
+    // 慢 fetch：每次请求 15ms，轮询 5ms → 强制轮询重叠。
+    const baseFetch = createRelayFetch(store)
+    const slowFetch: typeof globalThis.fetch = async (input, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 15))
+      return baseFetch(input, init)
+    }
+    const opts = { baseUrl: 'http://relay.test/api/relay', fetchFn: slowFetch, pollIntervalMs: 5 }
+    const received: HostToClientFrame[] = []
+    const host: HostTransport = createRelayHostTransport(noopHostEvents, opts)
+    host.open(ROOM)
+    const client: ClientTransport = createRelayClientTransport(
+      { ...noopClientEvents, onFrame: (frame) => received.push(frame) },
+      opts,
+    )
+    await waitFor(() => host.status === 'open', 'host open')
+    client.connect(ROOM)
+    await waitFor(() => client.status === 'connected', 'client connected')
+
+    const frame: HostToClientFrame = { frame: 'room-closed', protocolVersion: 1, messageId: 'm-close', roomId: ROOM }
+    host.broadcast(frame)
+    await waitFor(() => received.length >= 1, 'frame delivered')
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    const deliveries = received.filter((f) => f.frame === 'room-closed')
+    expect(deliveries.length).toBe(1)
+    host.close()
+    client.close()
+  })
 })

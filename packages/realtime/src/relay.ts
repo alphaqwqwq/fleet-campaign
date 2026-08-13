@@ -74,10 +74,13 @@ function startPollLoop(
   const intervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
   let timer: ReturnType<typeof setInterval> | null = null
   let stopped = false
+  let inFlight = false
   let failures = 0
 
   const tick = async (): Promise<void> => {
-    if (stopped) return
+    // 防并发：上一次 poll 未返回时跳过，否则同一批记录会被并发读取重复投递。
+    if (stopped || inFlight) return
+    inFlight = true
     try {
       await poll()
       failures = 0
@@ -88,6 +91,8 @@ function startPollLoop(
         stopped = true
         if (timer) clearInterval(timer)
       }
+    } finally {
+      inFlight = false
     }
   }
 
