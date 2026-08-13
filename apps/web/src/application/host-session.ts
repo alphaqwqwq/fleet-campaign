@@ -18,6 +18,7 @@ export interface HostSessionView {
   seed: string
   hasPlayer: boolean
   snapshot: Snapshot | null
+  lastEvent: BroadcastEvent | null
   roster: Snapshot['roster']
 }
 
@@ -32,6 +33,7 @@ export class HostSessionController {
   private readonly bindings = new Map<string, Binding>()
   private readonly revokedTokens = new Map<string, string>()
   private hostCommandCounter = 0
+  private lastEvent: BroadcastEvent | null = null
   private readonly listeners = new Set<() => void>()
 
   public constructor(private readonly options: HostSessionOptions) {
@@ -85,7 +87,7 @@ export class HostSessionController {
     this.changed()
   }
 
-  /** 只读视图（房主可见性快照 + 名单 + 种子）。 */
+  /** 只读视图（房主可见性快照 + 名单 + 种子 + 最近广播事件）。 */
   public getView(): HostSessionView {
     return {
       status: this.status,
@@ -94,6 +96,7 @@ export class HostSessionController {
       seed: this.seed,
       hasPlayer: [...this.bindings.values()].some((binding) => binding.role === 'player'),
       snapshot: this.game ? this.snapshot('host') : null,
+      lastEvent: this.lastEvent,
       roster: [...this.bindings.values()].map((binding) => ({ clientId: binding.clientId, seat: binding.seat ?? 'guest', role: binding.role })),
     }
   }
@@ -221,6 +224,7 @@ export class HostSessionController {
     this.ledger = { ...this.ledger, sequence: this.ledger.sequence + events.length }
     const result: CommandResult = { protocolVersion: 1, messageId: 'command-result', roomId: this.roomId, senderClientId: binding.clientId, kind: 'command-result', idempotencyKey: intent.idempotencyKey, accepted: true, event: events[0], snapshot: this.snapshot(binding.role) }
     this.ledger = recordReceipt(this.ledger, key, result)
+    this.lastEvent = events[events.length - 1] ?? this.lastEvent
     for (const event of events) this.options.hostTransport.broadcast({ frame: 'broadcast-event', protocolVersion: 1, messageId: 'broadcast-event', roomId: this.roomId, event })
     this.syncSnapshots()
     return result

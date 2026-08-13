@@ -1,4 +1,5 @@
 import type {
+  BroadcastEvent,
   CommandResult,
   ProtocolErrorCode,
   RosterRole,
@@ -35,6 +36,7 @@ export interface ClientSessionView {
   seat: SeatId | null
   snapshot: Snapshot | null
   lastResult: CommandResult | null
+  lastBroadcast: BroadcastEvent | null
   lastError: ClientSessionError | null
 }
 
@@ -54,6 +56,7 @@ export class ClientSessionController {
     seat: null,
     snapshot: null,
     lastResult: null,
+    lastBroadcast: null,
     lastError: null,
   }
 
@@ -240,6 +243,7 @@ export class ClientSessionController {
         this.token = null
         break
       case 'broadcast-event':
+        this.view.lastBroadcast = frame.event
         break
     }
     this.changed()
