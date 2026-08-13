@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全息战术地图 v2 — 舰船符号 + 指令坞</title>
+<style>
+  :root{
+    --bg-deep:#05090d;--panel:#0d1a24;--panel-2:#0f2030;--panel-edge:#1b3a4d;
+    --cyan:#59d8ff;--cyan-dim:#2a6f8f;--cyan-glow:rgba(89,216,255,.45);
+    --amber:#ffb34d;--red:#ff5a5a;--purple:#b78cff;
+    --white:#dff4ff;--text:#c4dce8;--text-dim:#6f8fa1;
+    --mono:"Consolas","SFMono-Regular",monospace;
+    --sans:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --glow:0 0 8px var(--cyan-glow);--radius:6px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{background:var(--bg-deep);color:var(--text);font-family:var(--sans);
+    display:flex;flex-direction:column;overflow:hidden;}
+
+  /* 顶栏 */
+  .top{display:flex;align-items:center;gap:14px;padding:6px 14px;background:var(--panel);
+    border-bottom:1px solid var(--panel-edge);}
+  .brand{color:var(--cyan);font-weight:700;letter-spacing:.14em;font-size:13px;text-shadow:var(--glow);}
+  .round{font-family:var(--mono);color:var(--cyan);font-size:13px;}
+  .phase{display:flex;gap:4px;margin-left:auto;font-size:11px;color:var(--text-dim);}
+  .phase .s{padding:2px 10px;border:1px solid var(--panel-edge);border-radius:3px;}
+  .phase .s.on{color:var(--cyan);border-color:var(--cyan);text-shadow:var(--glow);}
+
+  .body{flex:1;display:flex;min-height:0;}
+
+  /* 侧栏（只放数据，不放操作） */
+  .rail{width:250px;flex-shrink:0;background:var(--panel);
+    border-right:1px solid var(--panel-edge);padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+  .rail.right{border-right:none;border-left:1px solid var(--panel-edge);}
+  .rail-title{font-size:11px;letter-spacing:.18em;color:var(--text-dim);}
+  .rail-title b{color:var(--cyan);}
+
+  .ship{border:1px solid var(--panel-edge);border-radius:var(--radius);background:var(--panel-2);
+    padding:8px 10px;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+  .ship:hover{border-color:var(--cyan-dim);}
+  .ship.sel{border-color:var(--cyan);box-shadow:var(--glow);}
+  .ship .nm{color:var(--white);font-size:13px;display:flex;justify-content:space-between;}
+  .ship .cls{color:var(--text-dim);font-size:10px;}
+  .ship .hp{display:flex;gap:3px;margin-top:5px;}
+  .ship .hp i{flex:1;height:4px;background:#16303f;border-radius:2px;}
+  .ship .hp i.full{background:var(--cyan);box-shadow:var(--glow);}
+  .ship .hp i.dam{background:var(--amber);}
+  .ship .cnt{display:flex;gap:6px;margin-top:6px;font-size:10px;color:var(--text-dim);}
+  .pip{font-family:var(--mono);padding:1px 5px;border-radius:3px;border:1px solid var(--panel-edge);}
+  .pip.purple{color:var(--purple);border-color:var(--purple);}
+  .pip.cyan{color:var(--cyan);border-color:var(--cyan);}
+
+  .tl{border-top:1px solid var(--panel-edge);padding-top:6px;margin-top:auto;}
+  .tl .item{display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0;color:var(--text-dim);}
+  .tl .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:var(--glow);}
+  .tl .n{font-family:var(--mono);color:var(--cyan);}
+
+  /* 地图 + 指令坞 */
+  .stage{flex:1;position:relative;min-width:0;background:#04080c;display:flex;flex-direction:column;}
+  .mapwrap{flex:1;position:relative;min-height:0;}
+  canvas{position:absolute;inset:0;width:100%;height:100%;}
+
+  /* 指令坞：底部中央，随选中出现 */
+  .dock{
+    background:linear-gradient(180deg,rgba(13,26,36,.96),rgba(9,17,24,.98));
+    border-top:1px solid var(--cyan-dim);padding:8px 12px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .dock .sel{font-size:12px;color:var(--white);white-space:nowrap;}
+  .dock .sel b{color:var(--cyan);}
+  .dock .grp{display:flex;gap:6px;flex-wrap:wrap;}
+  .dock .grp-label{font-size:10px;color:var(--text-dim);align-self:center;letter-spacing:.12em;}
+  .dock .cmd{padding:6px 10px;border:1px solid var(--panel-edge);border-radius:var(--radius);
+    background:var(--panel-2);color:var(--text);font-size:12px;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+  .dock .cmd:hover{border-color:var(--cyan-dim);}
+  .dock .cmd.on{border-color:var(--cyan);box-shadow:var(--glow);color:var(--cyan);}
+  .dock .cmd[disabled]{opacity:.35;cursor:default;}
+  .dock .status{font-size:11px;color:var(--amber);margin-left:auto;white-space:nowrap;}
+
+  .toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);
+    padding:5px 14px;background:rgba(13,26,36,.92);border:1px solid var(--cyan);border-radius:4px;
+    font-size:12px;color:var(--white);opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+  <div class="top">
+    <span class="brand">FLEET COMMAND · CIC</span>
+    <span class="round">ROUND 3</span>
+    <div class="phase">
+      <span class="s">后勤</span><span class="s">弹着</span><span class="s on">行动</span><span class="s">接舷</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- 左栏：我方数据（纯数据） -->
+    <div class="rail">
+      <div class="rail-title">我方 · <b>第 7 舰队</b></div>
+      <div class="ship sel" data-ship="bb"><div class="nm"><span><svg viewBox="0 0 27 27" fill="#59d8ff" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"><path d="M4.5 8.5h8.35l-5.7 10H4.5z"/><path d="M13.75 8.5h3.1l-5.7 10h-3.1z"/><path d="m17.75 8.5 5.75 5-6 5h-5.45z"/></svg>玄武</span><span class="cls">战列舰</span></div>
+        <div class="hp"><i class="full"></i><i class="full"></i><i class="full"></i><i class="full"></i><i class="dam"></i></div>
+        <div class="cnt"><span class="pip purple">充能1/3</span><span class="pip cyan">鱼雷·飞1</span></div></div>
+      <div class="ship" data-ship="ff"><div class="nm"><span><svg viewBox="0 0 27 27" fill="#59d8ff" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"><path d="M4.5 8.5h10.35l-5.7 10H4.5z"/><path d="m15.75 8.5 1.75.02 6 4.98-6 5h-7.45z"/></svg>澜沧</span><span class="cls">巡防舰</span></div>
+        <div class="hp"><i class="full"></i><i class="full"></i><i class="full"></i><i class="full"></i></div>
+        <div class="cnt"><span class="pip cyan">锁定</span></div></div>
+      <div class="ship" data-ship="cv"><div class="nm"><span><svg viewBox="0 0 27 27" fill="#59d8ff" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"><path d="M4.5 8.5h10.55v4.55H4.5z"/><path d="M4.5 13.95h10.55v4.55H4.5z"/><path d="m15.95 8.5 7.55 5-7.55 5z"/></svg>归墟</span><span class="cls">航母</span></div>
+        <div class="hp"><i class="full"></i><i class="full"></i><i class="full"></i><i class="full"></i><i class="full"></i></div>
+        <div class="cnt"><span class="pip">机队×2</span></div></div>
+    </div>
+
+    <!-- 中栏：地图 + 指令坞 -->
+    <div class="stage">
+      <div class="mapwrap"><canvas id="holo"></canvas>
+        <div class="toast" id="toast"></div>
+      </div>
+      <div class="dock" id="dock">
+        <div class="sel">已选：<b id="sel-name">玄武 · 战列舰</b></div>
+        <span class="grp-label">机动</span>
+        <div class="grp">
+          <button class="cmd" id="c-adv">全速前进</button>
+          <button class="cmd" id="c-volley">全舰开火</button>
+          <button class="cmd" id="c-back">反向喷射</button>
+        </div>
+        <span class="grp-label">战术</span>
+        <div class="grp">
+          <button class="cmd" id="c-lock">锁定</button>
+          <button class="cmd" id="c-careful">谨慎射击</button>
+        </div>
+        <div class="status" id="dock-status"></div>
+      </div>
+    </div>
+
+    <!-- 右栏：敌方 + 时间线 -->
+    <div class="rail right">
+      <div class="rail-title">敌方 · <b>TBK</b></div>
+      <div class="ship" data-ship="e1"><div class="nm"><span><svg viewBox="0 0 27 27" fill="#ffb34d" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"><path d="M4.5 8.5h8.35l-5.7 10H4.5z"/><path d="M13.75 8.5h3.1l-5.7 10h-3.1z"/><path d="m17.75 8.5 5.75 5-6 5h-5.45z"/></svg>敌旗舰</span><span class="cls">战列舰</span></div>
+        <div class="hp"><i class="full"></i><i class="full"></i><i class="full"></i><i class="dam"></i></div>
+        <div class="cnt"><span class="pip purple">充能2/3</span></div></div>
+      <div class="ship" data-ship="e2"><div class="nm"><span><svg viewBox="0 0 27 27" fill="#ffb34d" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"><path d="m4.5 8.5 19 5-19 5z"/></svg>敌护航</span><span class="cls">护航舰×2</span></div>
+        <div class="hp"><i class="full"></i><i class="full"></i></div></div>
+      <div class="tl">
+        <div class="rail-title" style="margin-bottom:4px">时间线</div>
+        <div class="item"><span class="dot"></span><span class="n">鱼雷</span>还有 2 轮命中</div>
+        <div class="item"><span class="dot" style="background:var(--purple);box-shadow:0 0 6px var(--purple)"></span><span class="n">光矛</span>充能 1/3</div>
+        <div class="item"><span class="dot" style="background:var(--red);box-shadow:0 0 6px var(--red)"></span><span class="n">时钟</span>第 5 轮临界点</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const canvas=document.getElementById('holo'),ctx=canvas.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){DPR=window.devicePixelRatio||1;W=canvas.clientWidth;H=canvas.clientHeight;
+  canvas.width=W*DPR;canvas.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+window.addEventListener('resize',resize);resize();
+
+/* ===== 距离带轨：左=极限(5) 右=至近(0)，前进=向右收拢 ===== */
+const BANDS=['极限','长','瞄准镜','坍缩','近','至近']; // index=band number
+let band=3; // 当前距离
+const railL=0.10*W, railR=0.90*W;
+const BX=b=>railL+(5-b)*(railR-railL)/5; // band5 极限在左, band0 至近在右
+const CY=H*0.44;
+
+/* ===== 舰船对象：每个主力舰 = 一个舰种符号 =====
+   分类语言 = 规则书原名（战列舰/巡防舰/护航舰/航母）；
+   图标 = 借用战舰世界式"功能剪影"（大舰巨炮 / 细长护航 / 平甲板航母） */
+const CLS={bb:'战列舰',ff:'巡防舰',dd:'护航舰',cv:'航母'};
+const MY=[
+  {id:'bb',cls:'bb',name:'玄武',x:-0.032,dy:-14,hp:1.0,charge:1},
+  {id:'ff',cls:'ff',name:'澜沧',x:0.000,dy:12,hp:1.0,lock:true},
+  {id:'cv',cls:'cv',name:'归墟',x:0.032,dy:-20,hp:1.0},
+];
+const EN=[
+  {id:'e1',cls:'bb',name:'敌旗舰',x:-0.032,dy:-10,hp:0.72,charge:2},
+  {id:'e2',cls:'dd',name:'敌护航',x:0.032,dy:14,hp:0.9},
+];
+let sel=MY[0];
+
+/* ===== 绘制舰种符号（矢量，朝向敌人=朝右） ===== */
+function seed(n){let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))|0;return Math.abs(h);}
+let clock=0;
+function shipPos(s){
+  /* 环带 = 距离 + 相对速度：两侧战斗群保持间距、缓慢呼吸 + 每舰持续漂移/起伏 */
+  const fleetGap = 0.052*W;           // 双方战斗群中心距带轨节点的间距
+  const breathing = 0.003*W*Math.sin(clock*0.03);
+  const drift = Math.sin(clock*0.08+seed(s.id))*2;
+  const bob   = Math.sin(clock*0.25+seed(s.id))*1.6;
+  const side  = MY.includes(s) ? -1 : 1;
+  return {x:BX(band)+s.x*W + side*fleetGap + side*breathing + drift, y:CY+s.dy+bob};
+}
+
+/* 航迹：舰尾拖出的淡尾迹（战舰世界小地图式；mirror 时拖向右侧=敌舰船尾朝右） */
+function wake(x,y,color,mirror){
+  ctx.strokeStyle=color;ctx.globalAlpha=0.28;ctx.lineWidth=1;
+  ctx.beginPath();
+  if(mirror){ctx.moveTo(x+6,y);ctx.lineTo(x+20,y);}
+  else{ctx.moveTo(x-6,y);ctx.lineTo(x-20,y);}
+  ctx.stroke();
+  ctx.globalAlpha=1;
+}
+
+/* 舰种图标 = wowsdb 标准矢量（viewBox 27×27，船头朝右）。
+   规则书分类映射：战列舰→Battleship / 巡防舰→Cruiser / 护航舰→Destroyer / 航母→AirCarrier */
+const ICONS={
+  dd:['m4.5 8.5 19 5-19 5z'],
+  ff:['M4.5 8.5h10.35l-5.7 10H4.5z','m15.75 8.5 1.75.02 6 4.98-6 5h-7.45z'],
+  bb:['M4.5 8.5h8.35l-5.7 10H4.5z','M13.75 8.5h3.1l-5.7 10h-3.1z','m17.75 8.5 5.75 5-6 5h-5.45z'],
+  cv:['M4.5 8.5h10.55v4.55H4.5z','M4.5 13.95h10.55v4.55H4.5z','m15.95 8.5 7.55 5-7.55 5z'],
+};
+function drawShip(cls,x,y,color,scale,glow,mirror){
+  ctx.save(); ctx.translate(x,y); ctx.scale(scale*(mirror?-1:1), scale); ctx.translate(-13.5,-13.5);
+  ctx.fillStyle=color;
+  if(glow){ctx.shadowColor=color;ctx.shadowBlur=7;}
+  ctx.globalAlpha=0.92;
+  for(const d of ICONS[cls]||ICONS.dd){ ctx.fill(new Path2D(d)); }
+  ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+}
+function hpRing(s,color){
+  const p=shipPos(s); const w=30, h=2.5;
+  ctx.fillStyle='rgba(20,40,52,.8)'; ctx.fillRect(p.x-w/2,p.y+14,w,h);
+  ctx.fillStyle=color; ctx.fillRect(p.x-w/2,p.y+14,w*s.hp,h);
+}
+function drawSel(s){
+  const p=shipPos(s); const pulse=1+0.15*Math.sin(performance.now()/300);
+  ctx.strokeStyle='#59d8ff';ctx.lineWidth=1.5;ctx.shadowColor='#59d8ff';ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(p.x,p.y,16*pulse,0,6.28);ctx.stroke();ctx.shadowBlur=0;
+}
+
+/* ===== 特效：锚定到具体舰船符号 ===== */
+const FX=[];
+function pushFx(f){FX.push(f);}
+function fireFx(from,to,color){
+  pushFx({k:'fire',from:shipPos(from),to:shipPos(to),t:0,dur:0.9,color});
+  pushFx({k:'shield',to:shipPos(to),t:0.3,dur:0.7});
+  pushFx({k:'dmg',to:shipPos(to),t:0.5,dur:1.0});
+}
+let payload=null; let pt=0;
+function launchPayload(){
+  const from=shipPos(MY[0]), to=shipPos(EN[0]);
+  payload={x0:from.x,y0:from.y-8,x1:to.x,y1:to.y-8,t:0,dur:3.2};
+  pt=0;
+}
+
+/* ===== 星系背景：Kepler 轨道模拟 + 战区摄像机 =====
+   星系（恒星 + 天体真实轨道运动）· 战区（会动的动点=舰队，带轨轴线锚点）· 摄像机（挂战区投影天空）
+   巨物感/尺度：大小∝1/距离、近处巨行星占大半屏+环+卫星穿越、远处小而静、视差分层 */
+const farStars=Array.from({length:90},()=>({x:Math.random(),y:Math.random(),r:Math.random()*0.8+0.2,rph:Math.random()*6}));
+/* 配置（编辑器导出）：天体 + 摄像机卫星 */
+const FOCAL=410;
+const ELEV=42;
+const VIEWD=330;
+const SUN_R=24;
+const GIANT={id:0,parent:'sun',name:'巨行星',a:360,e:0.05,T:300,r:95,phase:1.1};
+const ROCKY={id:1,parent:'sun',name:'岩质行星',a:230,e:0.12,T:291,r:47,phase:3.4};
+const MOONO={id:2,parent:GIANT,name:'卫星',a:96,e:0.03,T:268,r:12,phase:2.2};
+/* 摄像机 = 绕巨行星的卫星（跟随巨行星 + 偏航；推进/后退轻微沿轨道移动） */
+const CAM={a:150,T:120,phase:0,follow:'0',yaw:-0.09,angle:1,avoid:0};
+
+/* Kepler：平均近点角 M → 解 E-e·sinE=M → 真近点角与矢径 */
+function kepler(body,t){
+  const M=2*Math.PI*t/body.T+body.phase;
+  let E=M;
+  for(let i=0;i<5;i++) E=E-(E-body.e*Math.sin(E)-M)/(1-body.e*Math.cos(E));
+  const nu=2*Math.atan2(Math.sqrt(1+body.e)*Math.sin(E/2),Math.sqrt(1-body.e)*Math.cos(E/2));
+  const rr=body.a*(1-body.e*body.e)/(1+body.e*Math.cos(nu));
+  return {x:Math.cos(nu)*rr, y:Math.sin(nu)*rr};
+}
+function keplerRel(body,t){
+  const M=2*Math.PI*t/body.T+body.phase;
+  return {x:Math.cos(M)*body.a, y:Math.sin(M)*body.a};
+}
+/* 摄像机 = 绕巨行星的卫星 */
+function camPos(gpos,t){
+  const ang=CAM.phase+2*Math.PI*t/CAM.T;
+  return {x:gpos.x+Math.cos(ang)*CAM.a, y:gpos.y+Math.sin(ang)*CAM.a};
+}
+/* 视线：跟随目标 + 偏航 */
+function viewDirFor(cp,tgt){
+  let vd;
+  if(CAM.follow==='none') vd=rotateVec({x:1,y:0},CAM.angle);
+  else vd=normVec({x:tgt.x-cp.x, y:tgt.y-cp.y});
+  vd=rotateVec(vd,CAM.yaw);
+  return vd;
+}
+/* 投影：轨道平面纯 2D，相机以俯角看平面（近低远高，地平线在视中心上方）。
+   屏幕 X=横向角偏移；屏幕 Y=俯视透视（沿=相机高度/目标距离） */
+function project(pos,rad,vpos,vdir){
+  const dx=pos.x-vpos.x, dy=pos.y-vpos.y;
+  const dist=Math.hypot(dx,dy)||1;
+  const along=dx*vdir.x+dy*vdir.y;
+  if(along<=0) return null;
+  const perp=dx*vdir.y-dy*vdir.x;
+  const sy=H*0.44+(ELEV/along - ELEV/VIEWD)*FOCAL;
+  const sx=W/2+(perp/along)*FOCAL;
+  return {x:sx,y:sy,size:rad/dist*FOCAL,dist,along};
+}
+function normVec(v){const d=Math.hypot(v.x,v.y)||1;return {x:v.x/d,y:v.y/d};}
+function rotateVec(v,a){return {x:v.x*Math.cos(a)-v.y*Math.sin(a), y:v.x*Math.sin(a)+v.y*Math.cos(a)};}
+/* 太阳投影：永不拒绝（夹紧 along），保证光照方向连续、明暗分界不瞬移 */
+function projectNoReject(pos,rad,vpos,vdir){
+  const dx=pos.x-vpos.x, dy=pos.y-vpos.y;
+  const dist=Math.hypot(dx,dy)||1;
+  const along=Math.max(dx*vdir.x+dy*vdir.y,40);
+  const perp=dx*vdir.y-dy*vdir.x;
+  const sy=H*0.44+(ELEV/along - ELEV/VIEWD)*FOCAL;
+  return {x:W/2+(perp/along)*FOCAL, y:sy, size:rad/dist*FOCAL};
+}
+function lightFor(sp,bp){const dd=Math.hypot(sp.x-bp.x,sp.y-bp.y)||1;return {x:(sp.x-bp.x)/dd, y:(sp.y-bp.y)/dd};}
+
+function bg(){
+  ctx.fillStyle='#04080c';ctx.fillRect(0,0,W,H);
+  /* 远处恒星（固定，视差最弱） */
+  for(const s of farStars){
+    ctx.globalAlpha=.22+.4*Math.abs(Math.sin(performance.now()/1600+s.rph));
+    ctx.fillStyle='#dceeff';ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r,0,6.28);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  /* 天体轨道位置 + 摄像机卫星 */
+  const t=clock;
+  const gpos=kepler(GIANT,t), rpos=kepler(ROCKY,t);
+  const mrel=keplerRel(MOONO,t), mpos={x:gpos.x+mrel.x, y:gpos.y+mrel.y};
+  const cp=camPos(gpos,t);
+  /* 视线：跟随目标（编辑器配置 follow=0 巨行星）+ 偏航 */
+  let tgt;
+  if(CAM.follow==='sun') tgt={x:0,y:0};
+  else if(CAM.follow==='1') tgt=rpos;
+  else if(CAM.follow==='2') tgt=mpos;
+  else tgt=gpos;
+  const vdir=viewDirFor(cp,tgt);
+
+  /* 光照：太阳屏幕位置（连续，永不拒绝）用于逐天体受光方向 */
+  const spC=projectNoReject({x:0,y:0},SUN_R,cp,vdir);
+  /* 太阳真实投影（可能为 null=在相机背后，不画）：参与深度排序，被巨行星遮挡时正确隐藏 */
+  const spReal=project({x:0,y:0},SUN_R,cp,vdir);
+
+  /* 遮挡：天体在巨行星盘内且比其近表更远 → 不画 */
+  const gp=project(gpos,GIANT.r,cp,vdir);
+  function occluded(bp,rad){
+    if(!gp) return false;
+    if(Math.hypot(bp.x-gp.x,bp.y-gp.y)>=gp.size) return false;
+    const gDist=Math.hypot(gpos.x-cp.x,gpos.y-cp.y)||1;
+    return Math.hypot(bp.x-cp.x,bp.y-cp.y)>(gDist-GIANT.r);
+  }
+  /* 光照系数：阳面朝相机的程度（Lambert 视角因子；太阳在背后→0→见阴面） */
+  function litFactor(bp){
+    const s=normVec({x:0-bp.x,y:0-bp.y});   // 朝太阳
+    const c=normVec({x:cp.x-bp.x,y:cp.y-bp.y}); // 朝相机
+    return Math.max(0, s.x*c.x+s.y*c.y);
+  }
+
+  /* 天体按深度排序（along 升序=远→近）；太阳无光晕、小圆盘，且与巨行星做遮挡 */
+  const list=[];
+  if(spReal&&!occluded(spReal,SUN_R)) list.push({along:spReal.along,draw:()=>{
+    ctx.fillStyle='#fff6d0';ctx.beginPath();ctx.arc(spReal.x,spReal.y,Math.max(spReal.size*1.5,1.5),0,6.28);ctx.fill();
+  }});
+  const rp=project(rpos,ROCKY.r,cp,vdir);
+  if(rp&&!occluded(rp,ROCKY.r)) list.push({along:rp.along,draw:()=>drawRocky(rp.x,rp.y,rp.size,lightFor(spC,rp),litFactor(rpos))});
+  if(gp) list.push({along:gp.along,draw:()=>drawGiant(gp.x,gp.y,gp.size,lightFor(spC,gp),litFactor(gpos))});
+  const mp=project(mpos,MOONO.r,cp,vdir);
+  if(mp&&!occluded(mp,MOONO.r)) list.push({along:mp.along,draw:()=>drawSat(mp.x,mp.y,mp.size,lightFor(spC,mp),litFactor(mpos))});
+  list.sort((a,b)=>a.along-b.along);
+  for(const b of list) b.draw();
+
+  /* 扫描网格 */
+  ctx.strokeStyle='rgba(89,216,255,.04)';ctx.lineWidth=1;ctx.beginPath();
+  for(let x=0;x<=W;x+=48){ctx.moveTo(x,0);ctx.lineTo(x,H);}
+  for(let y=0;y<=H;y+=48){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  ctx.stroke();
+}
+
+function drawPlanet(x,y,r,color,alpha,light){
+  if(r<2) return;
+  const g=ctx.createRadialGradient(x+light.x*r*0.5,y+light.y*r*0.5,r*0.1,x,y,r);
+  g.addColorStop(0,color);g.addColorStop(0.55,color);g.addColorStop(1,'rgba(6,14,24,.92)');
+  ctx.globalAlpha=alpha;ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();
+  ctx.globalAlpha=1;
+}
+function drawGiant(x,y,r,light,lit){
+  if(r<6) return;
+  ctx.shadowColor=`rgba(110,150,220,${0.12+0.3*lit})`;ctx.shadowBlur=r*0.4;
+  const g=ctx.createRadialGradient(x+light.x*r*0.55,y+light.y*r*0.55,r*0.1,x,y,r);
+  g.addColorStop(0,`rgba(175,220,255,${0.16+0.76*lit})`);
+  g.addColorStop(0.4,`rgba(60,120,200,${0.07+0.55*lit})`);
+  g.addColorStop(1,'rgba(3,9,20,.72)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();ctx.shadowBlur=0;
+  const term=ctx.createRadialGradient(x+light.x*r*0.75,y+light.y*r*0.75,0,x,y,r*1.2);
+  term.addColorStop(0,'rgba(255,255,255,0)');
+  term.addColorStop(0.6,'rgba(255,255,255,0)');
+  term.addColorStop(0.68,'rgba(4,8,12,.65)');
+  term.addColorStop(1,'rgba(2,5,9,.92)');
+  ctx.fillStyle=term;ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();
+}
+/* 岩质行星：暖棕、带陨坑（与冷白的卫星明显区分） */
+function drawRocky(x,y,r,light,lit){
+  if(r<2) return;
+  const g=ctx.createRadialGradient(x+light.x*r*0.5,y+light.y*r*0.5,r*0.1,x,y,r);
+  g.addColorStop(0,`rgba(224,184,142,${0.14+0.72*lit})`);
+  g.addColorStop(0.6,`rgba(185,138,94,${0.1+0.6*lit})`);
+  g.addColorStop(1,'rgba(26,16,8,.8)');
+  ctx.globalAlpha=.85;ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();
+  ctx.fillStyle=`rgba(58,36,20,${0.3+0.3*lit})`;
+  [[-0.32,0.18,0.22],[0.34,-0.12,0.15],[-0.04,-0.36,0.11]].forEach(([dx,dy,rr])=>{ctx.beginPath();ctx.arc(x+dx*r,y+dy*r,rr*r,0,6.28);ctx.fill();});
+  const term=ctx.createRadialGradient(x+light.x*r*0.75,y+light.y*r*0.75,0,x,y,r*1.2);
+  term.addColorStop(0,'rgba(255,255,255,0)');term.addColorStop(0.6,'rgba(255,255,255,0)');
+  term.addColorStop(0.68,'rgba(4,8,12,.6)');term.addColorStop(1,'rgba(2,5,9,.9)');
+  ctx.fillStyle=term;ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();
+  ctx.globalAlpha=1;
+}
+/* 卫星：冷白平滑、无表面细节 */
+function drawSat(x,y,r,light,lit){
+  if(r<1.5) return;
+  const g=ctx.createRadialGradient(x+light.x*r*0.5,y+light.y*r*0.5,r*0.1,x,y,r);
+  g.addColorStop(0,`rgba(255,255,255,${0.15+0.75*lit})`);
+  g.addColorStop(0.55,`rgba(220,232,242,${0.1+0.6*lit})`);
+  g.addColorStop(1,'rgba(40,52,66,.85)');
+  ctx.globalAlpha=.9;ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();
+  const term=ctx.createRadialGradient(x+light.x*r*0.75,y+light.y*r*0.75,0,x,y,r*1.2);
+  term.addColorStop(0,'rgba(255,255,255,0)');term.addColorStop(0.65,'rgba(255,255,255,0)');
+  term.addColorStop(0.72,'rgba(4,8,12,.55)');term.addColorStop(1,'rgba(2,5,9,.9)');
+  ctx.fillStyle=term;ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();
+  ctx.globalAlpha=1;
+}
+
+function draw(){
+  clock+=0.016;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#04080c';ctx.fillRect(0,0,W,H);
+  bg();
+
+  /* 带轨 */
+  const railY=H*0.14;
+  for(let b=0;b<6;b++){
+    const x=BX(b),on=b===band;
+    ctx.strokeStyle=on?'rgba(89,216,255,.9)':'rgba(89,216,255,.15)';ctx.lineWidth=on?2:1;
+    if(on){ctx.shadowColor='rgba(89,216,255,.6)';ctx.shadowBlur=10;}
+    ctx.beginPath();ctx.moveTo(x,railY-8);ctx.lineTo(x,H*0.84);ctx.stroke();ctx.shadowBlur=0;
+    ctx.fillStyle=on?'#a8e6ff':'rgba(150,180,195,.4)';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(BANDS[b],x,railY-12);
+    if(on){ctx.fillStyle='rgba(89,216,255,.10)';ctx.fillRect(x-0.03*W,railY-4,0.06*W,H*0.82-railY+4);}
+  }
+  const bandName=BANDS[band], flight=band+1; // 简化示意：越近飞行越短
+  const vel=Math.cos(clock*0.15), vs=vel>0?'接近':'拉开';
+  ctx.fillStyle='#59d8ff';ctx.font='11px monospace';ctx.textAlign='left';
+  ctx.fillText(`当前：${bandName}距离 · 酬载飞行 ${flight} · 相对速度 ${vs}`,railL,H*0.92);
+
+  /* 我方 / 敌方编队（舰种符号 + 航迹；敌舰左右镜像相向而视） */
+  for(const s of MY){ const p=shipPos(s); wake(p.x,p.y,'#59d8ff',false); drawShip(s.cls,p.x,p.y,'#59d8ff',1.0,s===sel,false); }
+  for(const s of EN){ const p=shipPos(s); wake(p.x,p.y,'#ffb34d',true); drawShip(s.cls,p.x,p.y,'#ffb34d',0.9,targeting&&canTarget(s),true); }
+  for(const s of MY) hpRing(s,'#59d8ff');
+  for(const s of EN) hpRing(s,'#ffb34d');
+  if(sel) drawSel(sel);
+
+  /* 飞行中的鱼雷（锚定两舰） */
+  if(payload){
+    const t=(pt%payload.dur)/payload.dur;
+    const x=payload.x0+(payload.x1-payload.x0)*t, y=payload.y0+(payload.y1-payload.y0)*t;
+    ctx.strokeStyle='rgba(89,216,255,.9)';ctx.lineWidth=2;ctx.shadowColor='#59d8ff';ctx.shadowBlur=8;
+    ctx.beginPath();ctx.moveTo(x-12,y);ctx.lineTo(x,y);ctx.stroke();ctx.shadowBlur=0;
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,2.4,0,6.28);ctx.fill();
+    ctx.fillStyle='#59d8ff';ctx.font='10px monospace';ctx.textAlign='left';
+    ctx.fillText(`● ${Math.ceil((1-t)*payload.dur)} 轮`,x+8,y-6);
+    pt+=0.016;
+  }
+
+  /* 特效 */
+  for(let i=FX.length-1;i>=0;i--){
+    const f=FX[i]; f.t+=0.016; if(f.t>f.dur){FX.splice(i,1);continue;}
+    const p=f.t/f.dur;
+    if(f.k==='fire'){ // 齐射弧线
+      ctx.strokeStyle=`rgba(89,216,255,${0.7*(1-p)})`;ctx.lineWidth=2;ctx.shadowColor='#59d8ff';ctx.shadowBlur=6;
+      ctx.beginPath();
+      for(let k=0;k<=12;k++){const tt=k/12;const xx=f.from.x+(f.to.x-f.from.x)*tt;
+        const yy=f.from.y+(f.to.y-f.from.y)*tt + Math.sin(tt*Math.PI)*(-2-p*16);
+        k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}
+      ctx.stroke();ctx.shadowBlur=0;
+    } else if(f.k==='shield'){ // 护盾
+      ctx.strokeStyle=`rgba(255,179,77,${0.85*(1-p)})`;ctx.lineWidth=2;ctx.shadowColor='#ffb34d';ctx.shadowBlur=10;
+      ctx.beginPath();ctx.arc(f.to.x,f.to.y,8+p*22,0,6.28);ctx.stroke();ctx.shadowBlur=0;
+    } else if(f.k==='dmg'){ // 伤害数字
+      ctx.fillStyle=`rgba(255,179,77,${1-p})`;ctx.font='bold 15px monospace';ctx.textAlign='center';
+      ctx.fillText('-12',f.to.x,f.to.y-10-p*16);
+    }
+  }
+
+  requestAnimationFrame(draw);
+}
+const canTarget=s=>true;
+
+/* ===== 交互：点舰船符号 ===== */
+function hit(s){const p=shipPos(s);return Math.hypot(mx-p.x,my-p.y)<18;}
+let mx=0,my=0;
+canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();mx=e.clientX-r.left;my=e.clientY-r.top;});
+canvas.addEventListener('click',e=>{
+  const r=canvas.getBoundingClientRect();const cx=e.clientX-r.left,cy=e.clientY-r.top;
+  for(const s of EN){const p=shipPos(s);if(Math.hypot(cx-p.x,cy-p.y)<18){
+    if(targeting){ fireFx(sel,s); toast(`「${curCmd}」 → ${s.name}`); clearTargeting(); }
+    else { selectEnemy(s); }
+    return;}}
+  for(const s of MY){const p=shipPos(s);if(Math.hypot(cx-p.x,cy-p.y)<18){selectShip(s);return;}}
+});
+function selectShip(s){sel=s;document.querySelectorAll('.ship').forEach(x=>x.classList.remove('sel'));
+  const el=document.querySelector(`.ship[data-ship="${s.id}"]`);if(el)el.classList.add('sel');
+  document.getElementById('sel-name').textContent=`${s.name} · ${CLS[s.cls]}`;
+  setStatus('');}
+function selectEnemy(s){sel=s;setStatus('敌方：'+s.name+'（数据只读）');}
+document.querySelectorAll('.ship[data-ship]').forEach(el=>el.addEventListener('click',()=>{
+  const id=el.dataset.ship;const all=[...MY,...EN];const s=all.find(x=>x.id===id);
+  if(s){if(MY.includes(s))selectShip(s);else selectEnemy(s);}
+}));
+
+/* ===== 指令坞 ===== */
+let targeting=false, curCmd=null;
+function setStatus(t){document.getElementById('dock-status').textContent=t||'';}
+function clearTargeting(){targeting=false;curCmd=null;setStatus('');
+  document.querySelectorAll('.dock .cmd').forEach(b=>b.classList.remove('on'));}
+function beginTarget(cmdName){targeting=true;curCmd=cmdName;setStatus(`索敌：点敌方单位 → ${cmdName}`);}
+
+document.getElementById('c-adv').addEventListener('click',()=>{if(!sel)return;
+  if(band>0){band--;launchPayload();CAM.phase+=0.04;} toast('全速前进 → 距离 '+(BANDS[band]+'距离'));});
+document.getElementById('c-back').addEventListener('click',()=>{if(band<5)band++;CAM.phase-=0.04;toast('反向喷射 · 巩固');});
+document.getElementById('c-volley').addEventListener('click',()=>{if(!sel)return;fireFx(sel,EN[0]);toast('全舰开火 → 敌旗舰');});
+document.getElementById('c-lock').addEventListener('click',()=>beginTarget('锁定开火坐标'));
+document.getElementById('c-careful').addEventListener('click',()=>{toast('谨慎射击：本回合不可会心 / 可瘫痪');});
+canvas.addEventListener('keydown',()=>{});
+
+let tt=null;
+function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');
+  clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2000);}
+
+launchPayload();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

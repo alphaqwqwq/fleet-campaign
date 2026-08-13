@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星系轨道 + 摄像机卫星编辑器</title>
+<style>
+  :root{
+    --bg-deep:#05090d;--panel:#0d1a24;--panel-2:#0f2030;--panel-edge:#1b3a4d;
+    --cyan:#59d8ff;--amber:#ffb34d;--red:#ff5a5a;--purple:#b78cff;
+    --white:#dff4ff;--text:#c4dce8;--text-dim:#6f8fa1;
+    --mono:"Consolas",monospace;--sans:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --glow:0 0 8px rgba(89,216,255,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg-deep);color:var(--text);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;}
+  .top{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--panel-edge);}
+  .top h1{color:var(--cyan);font-size:14px;letter-spacing:.1em;text-shadow:var(--glow);}
+  .top .hint{color:var(--text-dim);font-size:11px;}
+  .top button{background:var(--panel-2);border:1px solid var(--cyan);color:var(--white);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-left:auto;box-shadow:var(--glow);}
+  .main{flex:1;display:flex;min-height:0;}
+  .half{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .half .cap{font-size:11px;color:var(--text-dim);letter-spacing:.14em;padding:6px 12px;border-bottom:1px solid var(--panel-edge);}
+  .half .cap b{color:var(--cyan);}
+  .cv{flex:1;position:relative;}
+  canvas{position:absolute;inset:0;width:100%;height:100%;}
+  .panel{background:var(--panel);border-left:1px solid var(--panel-edge);width:236px;overflow-y:auto;padding:10px;}
+  .group{margin-bottom:9px;}
+  .group .t{font-size:10px;color:var(--text-dim);letter-spacing:.12em;margin-bottom:4px;}
+  .group .t b{color:var(--cyan);}
+  .row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text);margin-bottom:3px;}
+  .row label{width:58px;color:var(--text-dim);flex-shrink:0;}
+  .row input[type=range]{flex:1;}
+  .row .v{font-family:var(--mono);width:36px;text-align:right;color:var(--cyan);font-size:10px;}
+  .export{background:var(--panel);border-top:1px solid var(--panel-edge);padding:8px;}
+  .export .t{font-size:10px;color:var(--text-dim);margin-bottom:4px;}
+  .export textarea{width:100%;height:74px;background:var(--bg-deep);border:1px solid var(--panel-edge);color:var(--cyan);font-family:var(--mono);font-size:10px;border-radius:4px;padding:6px;}
+  .timebar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-top:1px solid var(--panel-edge);}
+  .timebar button{background:var(--panel-2);border:1px solid var(--cyan);color:var(--white);width:34px;height:26px;border-radius:4px;cursor:pointer;font-size:13px;}
+  .timebar input[type=range]{flex:1;}
+  .timebar .v{font-family:var(--mono);color:var(--cyan);font-size:11px;width:48px;text-align:right;}
+  .timebar label{font-size:10px;color:var(--text-dim);}
+  .timebar input#speed{flex:0 0 90px;}
+  .legend{font-size:10px;color:var(--text-dim);padding:6px 12px;border-top:1px solid var(--panel-edge);}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 4px 0 10px;}
+</style>
+</head>
+<body>
+
+  <div class="top">
+    <h1>星系轨道 · 摄像机卫星编辑器</h1>
+    <span class="hint">拖动天体调相位 / 拖动▲摄像机调位置 / 时间条模拟运动</span>
+    <button id="export">导出 JSON</button>
+  </div>
+
+  <div class="main">
+    <div class="half">
+      <div class="cap">俯视 · <b>轨道与布置</b></div>
+      <div class="cv"><canvas id="top"></canvas></div>
+      <div class="legend">
+        <span style="color:#fff2c4">◉ 恒星</span>
+        <span><i style="background:#59d8ff"></i>行星</span>
+        <span><i style="background:#ffb34d"></i>摄像机卫星（舰队）</span>
+      </div>
+    </div>
+
+    <div class="half">
+      <div class="cap">战场天空 · <b>摄像机视角</b></div>
+      <div class="cv"><canvas id="sky"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="group">
+        <div class="t"><b>摄像机卫星</b> · 绕巨行星</div>
+        <div class="row"><label>轨道 a</label><input type="range" id="ca" min="40" max="420" step="2" value="150"><span class="v" id="ca-v">150</span></div>
+        <div class="row"><label>周期 T</label><input type="range" id="ct" min="20" max="400" step="1" value="120"><span class="v" id="ct-v">120</span></div>
+        <div class="row"><label>相位</label><input type="range" id="cp" min="0" max="6.28" step="0.01" value="1.0"><span class="v" id="cp-v">1.0</span></div>
+      </div>
+      <div class="group">
+        <div class="t"><b>摄像机视角</b> · 跟随自动旋转</div>
+        <div class="row"><label>跟随</label><select id="follow">
+          <option value="0">巨行星</option><option value="1">岩质行星</option>
+          <option value="2">卫星</option><option value="sun">恒星</option>
+          <option value="tangent">轨道切向</option><option value="none">固定视角</option>
+        </select></div>
+        <div class="row"><label>偏航</label><input type="range" id="yaw" min="-3.14" max="3.14" step="0.01" value="0"><span class="v" id="yaw-v">0</span></div>
+        <div class="row"><label>固定视角</label><input type="range" id="ang" min="0" max="6.28" step="0.01" value="0.8"><span class="v" id="ang-v">0.8</span></div>
+        <div class="row"><label>避阳</label><input type="range" id="avoid" min="0" max="2" step="0.05" value="0.6"><span class="v" id="avoid-v">0.6</span></div>
+        <div class="row"><label>视场</label><input type="range" id="focal" min="200" max="1400" step="10" value="560"><span class="v" id="focal-v">560</span></div>
+        <div class="t" style="margin-top:4px;line-height:1.6">偏航=绕目标旋转视角；避阳=视线越靠近太阳越被推离（太阳不抢中心）；视场=值越小视野越宽、天体越小，越大越像长焦</div>
+      </div>
+      <div id="planet-panel"></div>
+    </div>
+  </div>
+
+  <div class="timebar">
+    <button id="play">⏸</button>
+    <input type="range" id="time" min="0" max="600" step="0.1" value="0">
+    <span class="v" id="time-v">0.0</span>
+    <label>速度</label>
+    <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1">
+    <span class="v" id="speed-v">1.0</span>
+  </div>
+
+  <div class="export">
+    <div class="t">导出配置（复制发给我即可）</div>
+    <textarea id="out" readonly></textarea>
+  </div>
+
+<script>
+const topC=document.getElementById('top'), tctx=topC.getContext('2d');
+const skyC=document.getElementById('sky'), sctx=skyC.getContext('2d');
+let TW=0,TH=0,SW=0,SH=0,DPR=1;
+function resize(){
+  DPR=window.devicePixelRatio||1;
+  TW=topC.clientWidth;TH=topC.clientHeight;SW=skyC.clientWidth;SH=skyC.clientHeight;
+  topC.width=TW*DPR;topC.height=TH*DPR;tctx.setTransform(DPR,0,0,DPR,0,0);
+  skyC.width=SW*DPR;skyC.height=SH*DPR;sctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize',resize);resize();
+
+/* ===== 世界：纯 2D 同心椭圆轨道；摄像机 = 绕巨行星的卫星 ===== */
+const WORLD=1000, CX=500, CY=500;
+const BODIES=[
+  {id:0,parent:'sun',a:360,e:0.05,T:300,r:132,phase:1.1,name:'巨行星'},
+  {id:1,parent:'sun',a:235,e:0.12,T:360,r:30,phase:3.4,name:'岩质行星'},
+  {id:2,parent:0,a:96,e:0.03,T:130,r:12,phase:2.2,name:'卫星'},
+];
+const SUN={r:24};
+/* 摄像机：绕巨行星的卫星。follow: none(固定视角)/0 巨行星/1 岩质/2 卫星/sun 恒星/tangent 轨道切向 */
+const CAM={a:150,T:120,phase:1.0, follow:'0', yaw:0, angle:0.8, avoid:0.6, focal:560};
+const ELEV=42, VIEWD=330;
+function norm2(v){const d=Math.hypot(v.x,v.y)||1;return {x:v.x/d,y:v.y/d};}
+function rot2(v,a){return {x:v.x*Math.cos(a)-v.y*Math.sin(a), y:v.x*Math.sin(a)+v.y*Math.cos(a)};}
+let simT=0, playing=true, simSpeed=1, lastTs=0;
+
+function keplerPos(body,t){
+  const M=2*Math.PI*t/body.T+body.phase;
+  let E=M; for(let i=0;i<5;i++) E=E-(E-body.e*Math.sin(E)-M)/(1-body.e*Math.cos(E));
+  const nu=2*Math.atan2(Math.sqrt(1+body.e)*Math.sin(E/2),Math.sqrt(1-body.e)*Math.cos(E/2));
+  const rr=body.a*(1-body.e*body.e)/(1+body.e*Math.cos(nu));
+  return {x:Math.cos(nu)*rr, y:Math.sin(nu)*rr};
+}
+function bodyAbs(body,t){
+  const p=keplerPos(body,t);
+  if(body.parent==='sun') return {x:CX+p.x,y:CY+p.y};
+  const par=BODIES[body.parent];
+  const pp=par?bodyAbs(par,t):{x:CX,y:CY};
+  return {x:pp.x+p.x,y:pp.y+p.y};
+}
+function camPos(t){
+  const gp=bodyAbs(BODIES[0],t);
+  const ang=CAM.phase+2*Math.PI*t/CAM.T;
+  return {x:gp.x+Math.cos(ang)*CAM.a, y:gp.y+Math.sin(ang)*CAM.a};
+}
+/* 视线：跟随模式（自动旋转追踪目标）→ 偏航 → 平滑避阳（无硬翻转 → 无瞬移） */
+function viewDir(cp){
+  let vd;
+  if(CAM.follow==='tangent'){                     // 轨道切向：朝前进方向
+    const gp=bodyAbs(BODIES[0],simT);
+    const r={x:cp.x-gp.x, y:cp.y-gp.y};
+    vd=norm2({x:-r.y, y:r.x});
+  } else if(CAM.follow==='none'){                 // 固定世界视角
+    vd=rot2({x:1,y:0},CAM.angle);
+  } else {                                        // 跟随某天体：始终指向它
+    const tgt = CAM.follow==='sun' ? {x:CX,y:CY} : bodyAbs(BODIES[+CAM.follow],simT);
+    vd=norm2({x:tgt.x-cp.x, y:tgt.y-cp.y});
+  }
+  vd=rot2(vd,CAM.yaw);                            // 偏航：绕目标旋转视角
+  if(CAM.avoid>0){                                // 避阳：平滑推离太阳
+    const sunD=norm2({x:CX-cp.x,y:CY-cp.y});
+    const dot=Math.max(vd.x*sunD.x+vd.y*sunD.y,0);
+    const perp={x:-sunD.y,y:sunD.x};
+    const sgn=vd.x*perp.x+vd.y*perp.y>=0?1:-1;
+    vd=norm2({x:vd.x+perp.x*sgn*CAM.avoid*dot, y:vd.y+perp.y*sgn*CAM.avoid*dot});
+  }
+  return vd;
+}
+
+/* 投影（俯视相机：近低远高），Pnr 用于太阳（永不拒绝 → 光照连续） */
+function P(pos,rad,vpos,vdir,focal){
+  const dx=pos.x-vpos.x, dy=pos.y-vpos.y;
+  const dist=Math.hypot(dx,dy)||1;
+  const along=dx*vdir.x+dy*vdir.y;
+  if(along<=0) return null;
+  const perp=dx*vdir.y-dy*vdir.x;
+  return {x:SW/2+perp/along*focal, y:SH*0.5+(ELEV/along-ELEV/VIEWD)*focal, size:rad/dist*focal, along, dist};
+}
+function Pnr(pos,rad,vpos,vdir,focal){
+  const dx=pos.x-vpos.x, dy=pos.y-vpos.y;
+  const dist=Math.hypot(dx,dy)||1;
+  const along=Math.max(dx*vdir.x+dy*vdir.y,40);
+  const perp=dx*vdir.y-dy*vdir.x;
+  return {x:SW/2+perp/along*focal, y:SH*0.5+(ELEV/along-ELEV/VIEWD)*focal, size:rad/dist*focal, along, dist};
+}
+function lightFor(sp,bp){const dd=Math.hypot(sp.x-bp.x,sp.y-bp.y)||1;return {x:(sp.x-bp.x)/dd,y:(sp.y-bp.y)/dd};}
+
+/* ===== 俯视 ===== */
+function drawTop(){
+  tctx.clearRect(0,0,TW,TH); tctx.fillStyle='#04080c'; tctx.fillRect(0,0,TW,TH);
+  const sc=Math.min(TW,TH)/WORLD*0.86;
+  const X=c=>(c-CX)*sc+TW/2, Y=c=>(c-CY)*sc+TH/2;
+  const t=simT;
+  const pos={}; for(const b of BODIES) pos[b.id]=bodyAbs(b,t);
+  /* 行星轨道 + 标注 */
+  for(const b of BODIES){
+    const center=b.parent==='sun'?{x:CX,y:CY}:pos[b.parent];
+    const r=b.a*sc;
+    tctx.strokeStyle='rgba(89,216,255,.22)';tctx.lineWidth=1;tctx.setLineDash([6,5]);
+    tctx.beginPath();tctx.ellipse(X(center.x),Y(center.y),r,r,0,0,6.28);tctx.stroke();tctx.setLineDash([]);
+    tctx.fillStyle='rgba(89,216,255,.55)';tctx.font='9px monospace';tctx.textAlign='left';
+    tctx.fillText(`a=${b.a} T=${b.T}`, X(center.x)+r+2, Y(center.y)-2);
+  }
+  /* 摄像机卫星轨道（绕巨行星） */
+  const gp=pos[0];
+  tctx.strokeStyle='rgba(255,179,77,.35)';tctx.lineWidth=1;tctx.setLineDash([4,6]);
+  tctx.beginPath();tctx.ellipse(X(gp.x),Y(gp.y),CAM.a*sc,CAM.a*sc,0,0,6.28);tctx.stroke();tctx.setLineDash([]);
+  /* 恒星 */
+  tctx.fillStyle='#fff2c4';tctx.shadowColor='#fff2c4';tctx.shadowBlur=14;
+  tctx.beginPath();tctx.arc(X(CX),Y(CY),SUN.r,0,6.28);tctx.fill();tctx.shadowBlur=0;
+  /* 天体 */
+  for(const b of BODIES){
+    const p=pos[b.id];
+    tctx.fillStyle='#59d8ff';
+    tctx.beginPath();tctx.arc(X(p.x),Y(p.y),Math.max(b.r*0.12,3),0,6.28);tctx.fill();
+    tctx.font='10px sans-serif';tctx.fillStyle='#6f8fa1';tctx.textAlign='left';
+    tctx.fillText(b.name, X(p.x)+6, Y(p.y)+3);
+  }
+  /* 摄像机卫星 + 视线锥 */
+  const cp=camPos(t);
+  const vx=X(cp.x), vy=Y(cp.y);
+  tctx.fillStyle='#ffb34d';tctx.shadowColor='#ffb34d';tctx.shadowBlur=8;
+  tctx.beginPath();tctx.moveTo(vx,vy-11);tctx.lineTo(vx+8,vy+8);tctx.lineTo(vx-8,vy+8);tctx.closePath();tctx.fill();tctx.shadowBlur=0;
+  const vdir=viewDir(cp);
+  const vl=60;
+  tctx.strokeStyle='rgba(255,255,255,.65)';tctx.lineWidth=1.5;
+  tctx.beginPath();tctx.moveTo(vx,vy);tctx.lineTo(vx+vdir.x*vl,vy+vdir.y*vl);tctx.stroke();
+  const halfA=Math.atan((TW/2)/CAM.focal);
+  tctx.fillStyle='rgba(255,255,255,.08)';
+  const a1=Math.atan2(vdir.y,vdir.x)-halfA, a2=Math.atan2(vdir.y,vdir.x)+halfA;
+  tctx.beginPath();tctx.moveTo(vx,vy);
+  tctx.lineTo(vx+Math.cos(a1)*vl*2.4,vy+Math.sin(a1)*vl*2.4);
+  tctx.lineTo(vx+Math.cos(a2)*vl*2.4,vy+Math.sin(a2)*vl*2.4);tctx.closePath();tctx.fill();
+}
+
+/* ===== 战场天空 ===== */
+function drawSky(){
+  sctx.clearRect(0,0,SW,SH); sctx.fillStyle='#04080c'; sctx.fillRect(0,0,SW,SH);
+  const focal=+CAM.focal, t=simT;
+  const cp=camPos(t);
+  const vdir=viewDir(cp);
+  const spC=Pnr({x:CX,y:CY},SUN.r,cp,vdir,focal);
+  const pos={}; for(const b of BODIES) pos[b.id]=bodyAbs(b,t);
+  const g=pos[0], rp=pos[1], mp=pos[2];
+  const gp=P(g,BODIES[0].r,cp,vdir,focal);
+  /* 遮挡：天体在巨行星盘内且比巨行星近表更远 → 不画 */
+  function occluded(bp,pr){
+    if(!gp) return false;
+    const dx=bp.x-gp.x, dy=bp.y-gp.y;
+    if(Math.hypot(dx,dy)>=gp.size) return false;      // 不在盘内
+    const gDist=Math.hypot(g.x-cp.x,g.y-cp.y)||1;
+    const nearSurf=gDist-BODIES[0].r;                 // 巨行星近表距离
+    const bDist=Math.hypot(bp.x-cp.x,bp.y-cp.y)||1;
+    return bDist>nearSurf;
+  }
+  /* 光照系数：阳面朝相机的程度（Lambert；太阳在背后→0→阴面） */
+  function litFactor(bp){
+    const s=norm2({x:CX-bp.x,y:CY-bp.y});
+    const c=norm2({x:cp.x-bp.x,y:cp.y-bp.y});
+    return Math.max(0,s.x*c.x+s.y*c.y);
+  }
+  const spReal=P({x:CX,y:CY},SUN.r,cp,vdir,focal);
+  const list=[];
+  if(spReal&&!occluded(spReal,SUN.r)) list.push({along:spReal.along,draw:()=>{
+    sctx.fillStyle='#fff6d0';sctx.beginPath();sctx.arc(spReal.x,spReal.y,Math.max(spReal.size*1.5,1.5),0,6.28);sctx.fill();
+  }});
+  if(gp) list.push({along:gp.along,draw:()=>drawGiant(sctx,gp.x,gp.y,gp.size,lightFor(spC,gp),litFactor(g))});
+  const pr=P(rp,BODIES[1].r,cp,vdir,focal);
+  if(pr&&!occluded(pr,BODIES[1].r)) list.push({along:pr.along,draw:()=>drawRocky(sctx,pr.x,pr.y,pr.size,lightFor(spC,pr),litFactor(rp))});
+  const pm=P(mp,BODIES[2].r,cp,vdir,focal);
+  if(pm&&!occluded(pm,BODIES[2].r)) list.push({along:pm.along,draw:()=>drawSat(sctx,pm.x,pm.y,pm.size,lightFor(spC,pm),litFactor(mp))});
+  list.sort((a,b)=>a.along-b.along);
+  for(const b of list) b.draw();
+}
+function drawRocky(c,x,y,r,light,lit){
+  if(r<2) return;
+  const g=c.createRadialGradient(x+light.x*r*0.5,y+light.y*r*0.5,r*0.1,x,y,r);
+  g.addColorStop(0,`rgba(224,184,142,${0.14+0.72*lit})`);g.addColorStop(0.6,`rgba(185,138,94,${0.1+0.6*lit})`);g.addColorStop(1,'rgba(26,16,8,.8)');
+  c.globalAlpha=.85;c.fillStyle=g;c.beginPath();c.arc(x,y,r,0,6.28);c.fill();
+  c.fillStyle=`rgba(58,36,20,${0.3+0.3*lit})`;
+  [[-0.32,0.18,0.22],[0.34,-0.12,0.15],[-0.04,-0.36,0.11]].forEach(([dx,dy,rr])=>{c.beginPath();c.arc(x+dx*r,y+dy*r,rr*r,0,6.28);c.fill();});
+  const term=c.createRadialGradient(x+light.x*r*0.75,y+light.y*r*0.75,0,x,y,r*1.2);
+  term.addColorStop(0,'rgba(255,255,255,0)');term.addColorStop(0.6,'rgba(255,255,255,0)');
+  term.addColorStop(0.68,'rgba(4,8,12,.6)');term.addColorStop(1,'rgba(2,5,9,.9)');
+  c.fillStyle=term;c.beginPath();c.arc(x,y,r,0,6.28);c.fill();c.globalAlpha=1;
+}
+function drawSat(c,x,y,r,light,lit){
+  if(r<1.5) return;
+  const g=c.createRadialGradient(x+light.x*r*0.5,y+light.y*r*0.5,r*0.1,x,y,r);
+  g.addColorStop(0,`rgba(255,255,255,${0.15+0.75*lit})`);g.addColorStop(0.55,`rgba(220,232,242,${0.1+0.6*lit})`);g.addColorStop(1,'rgba(40,52,66,.85)');
+  c.globalAlpha=.9;c.fillStyle=g;c.beginPath();c.arc(x,y,r,0,6.28);c.fill();
+  const term=c.createRadialGradient(x+light.x*r*0.75,y+light.y*r*0.75,0,x,y,r*1.2);
+  term.addColorStop(0,'rgba(255,255,255,0)');term.addColorStop(0.65,'rgba(255,255,255,0)');
+  term.addColorStop(0.72,'rgba(4,8,12,.55)');term.addColorStop(1,'rgba(2,5,9,.9)');
+  c.fillStyle=term;c.beginPath();c.arc(x,y,r,0,6.28);c.fill();c.globalAlpha=1;
+}
+function drawGiant(c,x,y,r,light,lit){
+  if(r<6) return;
+  const g=c.createRadialGradient(x+light.x*r*0.55,y+light.y*r*0.55,r*0.1,x,y,r);
+  g.addColorStop(0,`rgba(175,220,255,${0.16+0.76*lit})`);g.addColorStop(0.4,`rgba(60,120,200,${0.07+0.55*lit})`);g.addColorStop(1,'rgba(3,9,20,.72)');
+  c.fillStyle=g;c.beginPath();c.arc(x,y,r,0,6.28);c.fill();
+  const term=c.createRadialGradient(x+light.x*r*0.75,y+light.y*r*0.75,0,x,y,r*1.2);
+  term.addColorStop(0,'rgba(255,255,255,0)');term.addColorStop(0.6,'rgba(255,255,255,0)');
+  term.addColorStop(0.68,'rgba(4,8,12,.65)');term.addColorStop(1,'rgba(2,5,9,.92)');
+  c.fillStyle=term;c.beginPath();c.arc(x,y,r,0,6.28);c.fill();
+}
+
+/* ===== 动画循环 ===== */
+function loop(ts){
+  if(!lastTs) lastTs=ts;
+  const dt=(ts-lastTs)/1000; lastTs=ts;
+  if(playing){ simT=(simT+dt*simSpeed)%600; }
+  const ti=document.getElementById('time');
+  if(!ti.matches(':focus')){ ti.value=simT.toFixed(1); document.getElementById('time-v').textContent=simT.toFixed(1); }
+  drawTop(); drawSky();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ===== 控件 ===== */
+function bind(id,cb){const el=document.getElementById(id);el.addEventListener('input',()=>{cb(+el.value);document.getElementById(id+'-v').textContent=(+el.value).toFixed(2).replace(/0+$/,'').replace(/\.$/,'');});}
+bind('ca',v=>CAM.a=v); bind('ct',v=>CAM.T=v); bind('cp',v=>CAM.phase=v);
+bind('ang',v=>CAM.angle=v); bind('avoid',v=>CAM.avoid=v); bind('focal',v=>CAM.focal=v); bind('yaw',v=>CAM.yaw=v);
+document.getElementById('follow').addEventListener('change',e=>CAM.follow=e.target.value);
+
+const panel=document.getElementById('planet-panel');
+BODIES.forEach(b=>{
+  const g=document.createElement('div');g.className='group';
+  g.innerHTML=`<div class="t"><b>${b.name}</b></div>`+
+    `<div class="row"><label>a</label><input type="range" data-i="${b.id}" data-k="a" min="40" max="460" value="${b.a}"><span class="v" id="pa${b.id}">${b.a}</span></div>`+
+    `<div class="row"><label>T</label><input type="range" data-i="${b.id}" data-k="T" min="30" max="600" value="${b.T}"><span class="v" id="pT${b.id}">${b.T}</span></div>`+
+    `<div class="row"><label>r</label><input type="range" data-i="${b.id}" data-k="r" min="4" max="160" value="${b.r}"><span class="v" id="pr${b.id}">${b.r}</span></div>`;
+  panel.appendChild(g);
+});
+panel.querySelectorAll('input[type=range]').forEach(inp=>{
+  inp.addEventListener('input',()=>{const b=BODIES[+inp.dataset.i];b[inp.dataset.k]=+inp.value;document.getElementById('p'+inp.dataset.k+b.id).textContent=inp.value;});
+});
+
+document.getElementById('play').addEventListener('click',()=>{playing=!playing;document.getElementById('play').textContent=playing?'⏸':'▶';});
+document.getElementById('time').addEventListener('input',e=>{simT=+e.target.value;document.getElementById('time-v').textContent=simT.toFixed(1);});
+document.getElementById('speed').addEventListener('input',e=>{simSpeed=+e.target.value;document.getElementById('speed-v').textContent=simSpeed.toFixed(1);});
+
+/* 拖动：天体调相位 / 摄像机调相位 */
+let drag=null;
+function pt(e,cv){const r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+function w2c(p){const sc=Math.min(TW,TH)/WORLD*0.86;return {x:(p.x-TW/2)/sc+CX, y:(p.y-TH/2)/sc+CY};}
+topC.addEventListener('pointerdown',e=>{
+  const p=pt(e,topC), sc=Math.min(TW,TH)/WORLD*0.86;
+  const X=c=>(c-CX)*sc+TW/2, Y=c=>(c-CY)*sc+TH/2;
+  const t=simT, pos={}; for(const b of BODIES) pos[b.id]=bodyAbs(b,t);
+  const cp=camPos(t), vx=X(cp.x), vy=Y(cp.y);
+  if(Math.hypot(p.x-vx,p.y-vy)<16){drag={k:'cam'};return;}
+  for(const b of BODIES){const bp=pos[b.id];if(Math.hypot(p.x-X(bp.x),p.y-Y(bp.y))<12){drag={k:'body',i:b.id};return;}}
+});
+topC.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  const p=pt(e,topC), t=simT;
+  const pos={}; for(const b of BODIES) pos[b.id]=bodyAbs(b,t);
+  const gp=pos[0];
+  if(drag.k==='cam'){ const w=w2c(p); CAM.phase=Math.atan2(w.y-gp.y,w.x-gp.x); document.getElementById('cp').value=CAM.phase.toFixed(2); document.getElementById('cp-v').textContent=CAM.phase.toFixed(2); }
+  else if(drag.k==='body'){ const b=BODIES[drag.i]; const base=b.parent==='sun'?{x:CX,y:CY}:pos[b.parent]; b.phase=Math.atan2(w2c(p).y-base.y, w2c(p).x-base.x); }
+});
+topC.addEventListener('pointerup',()=>drag=null);
+
+/* 导出 */
+document.getElementById('export').addEventListener('click',()=>{
+  const cfg={
+    sun:{r:SUN.r},
+    bodies:BODIES.map(b=>({id:b.id,parent:b.parent,name:b.name,a:b.a,e:b.e,T:b.T,r:b.r,phase:+b.phase.toFixed(2)})),
+    camera:{a:CAM.a,T:CAM.T,phase:+CAM.phase.toFixed(2),follow:CAM.follow,yaw:+CAM.yaw.toFixed(2),angle:+CAM.angle.toFixed(2),avoid:+CAM.avoid.toFixed(2),focal:CAM.focal,elev:ELEV,viewd:VIEWD}
+  };
+  const out=document.getElementById('out');
+  out.value=JSON.stringify(cfg,null,2);
+  out.select(); try{document.execCommand('copy');}catch(e){}
+});
+</script>
+</body>
+</html>
