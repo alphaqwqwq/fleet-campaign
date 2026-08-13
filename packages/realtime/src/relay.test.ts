@@ -66,7 +66,7 @@ function waitFor(predicate: () => boolean, message = 'timeout'): Promise<void> {
   })
 }
 
-const ROOM = 'r_testroomabcd'
+const ROOM = '12345'
 const CLIENT_ID = 'u_00000000-0000-4000-8000-000000000001'
 
 function joinFrame(): ClientToHostFrame {
@@ -147,5 +147,23 @@ describe('relay polling transport', () => {
     const invalid = { frame: 'not-a-frame', protocolVersion: 1 } as unknown as HostToClientFrame
     expect(host.sendTo('cn_x', invalid)).toBe(false)
     host.close()
+  })
+
+  it('rejects a second host on an occupied room and frees the code on close', async () => {
+    const store = createMemoryRelayStore()
+    const fetchFn = createRelayFetch(store)
+    const host = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
+    host.open(ROOM)
+    await waitFor(() => host.status === 'open', 'first host open')
+
+    const host2 = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
+    host2.open(ROOM)
+    await waitFor(() => host2.status === 'transport_unavailable', 'second host rejected as occupied')
+
+    host.close()
+    const host3 = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
+    host3.open(ROOM)
+    await waitFor(() => host3.status === 'open', 'code freed and reopened')
+    host3.close()
   })
 })

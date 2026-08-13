@@ -157,7 +157,7 @@ function gameOf(snapshot: SnapshotFrame['snapshot']) {
 describe('createHostSession', () => {
   it('creates a room with valid ids and opens the endpoint', () => {
     const h = harness()
-    expect(h.roomId).toMatch(/^r_[A-Za-z0-9_-]{12}$/)
+    expect(h.roomId).toMatch(/^\d{5}$/)
     expect(h.created.campaignId).toMatch(/^c_/)
     expect(h.controller.status).toBe('open')
     expect(h.hostTransport.status).toBe('open')
@@ -411,7 +411,7 @@ describe('createHostSession', () => {
       command: 'start-demo',
       idempotencyKey: 'g'.repeat(22),
       expectedEventSequence: 0,
-      intentRoomId: 'r_ZZZZZZZZZZZZ',
+        intentRoomId: '99999',
     })
     const result = frames.find((f) => f.frame === 'command-result')
     expect(result && 'result' in result && result.result.accepted).toBe(false)

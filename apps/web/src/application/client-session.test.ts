@@ -121,7 +121,7 @@ describe('createClientSession', () => {
       clientTransport,
       clientId: generateClientId(),
     })
-    controller.connect('r_AbCdEfGh1234', 'player')
+    controller.connect('12345', 'player')
     expect(controller.view.status).toBe('transport_unavailable')
   })
 

@@ -94,7 +94,7 @@ describe('campaign persistence', () => {
   })
 
   it.each([
-    ['roomId', 'r_abcdefghijkl'],
+        ['roomId', '12345'],
     ['clientId', 'u_123e4567-e89b-42d3-a456-426614174000'],
     ['token', 'secret'],
     ['commandReceipts', []],

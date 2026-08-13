@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { connectMemoryClient, createMemoryHostTransport, MemoryClientTransport } from './memory'
 import type { HostTransportEvents } from './connection'
 
-const ROOM = 'r_AbCdEfGh1234'
+const ROOM = '12345'
 
 function joinRequest(clientId: string, messageId = 'm_1') {
   return {

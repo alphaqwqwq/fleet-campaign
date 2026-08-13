@@ -61,6 +61,18 @@ PR 与 `main` 推送由 GitHub Actions 执行同一套门禁；本地先跑通�
 - **Vercel token（Windows）**：`%APPDATA%\xdg.data\com.vercel.cli\auth.json`；API 用 Bearer 注入，不写仓库/文档。
 - **旧项目删除权限边界**：Vercel 项目删除用项目 token（`DELETE /v9/projects/{id}` → 204 → 查询 404 确认）；GitHub 仓库删除需 `delete_repo` scope（`gh auth refresh -h github.com -s delete_repo` 或用户网页操作）。
 
+## Vercel 轮询中继部署与验证（ADR-005）
+
+联机实时层默认走中继（同源 `/api/relay`）。部署与排障清单：
+
+1. **依赖**：Vercel Storage 创建 **Official Redis for Vercel**（免费档），连接项目时勾 Production + Preview、**Custom Prefix 留空**（包只认标准名）。
+2. **环境变量**：项目会自动注入 `REDIS_URL`（`redis://...` 形式）。注意**不是** `KV_REST_API_*`——官方 Redis 不提供 REST 变量，`@vercel/kv` 用不了，`api/relay.ts` 用的是 `redis` 包读 `REDIS_URL`。
+3. **函数必须自包含**：`api/relay.ts` 已内联中继 handler。跨目录 `../packages/...` 相对导入会让 Vercel 打包器追踪不到 → 部署后一律 `FUNCTION_INVOCATION_FAILED`（HTTP 500 + "A server error has occurred"）。改 handler 逻辑必须同时改 `packages/realtime/src/relay-handler.ts`（保持一致）。
+4. **验证 URL**：部署完成后浏览器打开 `https://fleet.alphaqwq.xyz/api/relay?room=12345&op=host-poll`，期望 `{"records":[],"cursor":0}`（HTTP 200）。返回 500 先查 `REDIS_URL` 是否进 Production、函数是否自包含。
+5. **部署后强制刷新**：前端 JS 有缓存，改完必须 `Ctrl+Shift+R`（手机清站点数据），否则还在跑旧包。
+6. **房间码**：5 位数字（10000–99999），中继按码建房间；房主 `host-open` 会做占据检查（409 `room_occupied`）并清空旧日志，`host-close`/1h TTL 释放码。撞码概率可忽略；真撞了房主显示传输不可用，关闭重建即可。
+7. **备选传输**：`?transport=peerjs` 可回退 PeerJS 直连（依赖外部信令，国内不可靠，仅调试用）。
+
 ## 回滚与止损
 
 - Git 回滚用 `git revert <commit>`，不重写共享历史；未合并 PR 可关闭。
