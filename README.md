@@ -3,16 +3,18 @@
 Fleet Campaign 是一个网页联机电子桌游项目：网页 + 临时房主联机 + 电子化游戏 + 可降级 LLM 叙事。
 
 领域规则、协议、本地存档与实时传输已具备 demo-v1 技术骨架；网页垂直切片（建房/加入/对局/存档 UI）为下一个 feature。
+M2 设计基线已定稿：[DESIGN-M2](docs/reference/DESIGN-M2.md)；交战引擎（M2-A）领域命令/事件 schema 见 [DESIGN-M2-SCHEMA](docs/reference/DESIGN-M2-SCHEMA.md)。
 
 ## 工作区
 
 ```text
 apps/web                 React/Vite 网页 + 组合层（host/client session 编排）
 packages/domain          demo-v1 纯规则（reducer/ledger/rng）
+packages/battle          M2-A 交战引擎（纯规则、确定性可复现；单场交战沙盒）
 packages/protocol        protocol v1 信封/命令/快照/错误码
-packages/persistence     本地存档 v1 + 导入导出/迁移
+packages/persistence     本地存档 v1 + 导入导出/迁移（存档 v2 见 ADR-006）
 packages/realtime        可替换实时传输（PeerJS 适配 + 内存替身）
-packages/content         demo-v1 内容模板
+packages/content         demo-v1 内容模板 + M2 交战内容 schema/沙盒夹具
 ```
 
 架构与边界见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，现行产品契约见 [docs/reference/SPEC.md](docs/reference/SPEC.md)。

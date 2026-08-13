@@ -40,6 +40,7 @@
 - 导出包 `FleetCampaignSave`：`{ format: "fleet-campaign-save", formatVersion: 1, save }`（UTF-8 JSON，导入上限 1 MB）。
 - 导入依次校验大小 → 包装格式 → 版本 → schema → 内容 ID → 领域不变量 → RNG 状态；任一步失败不覆盖现有档案，返回 `save_invalid / save_unsupported_version / save_incompatible_content`。
 - 迁移：只读同主版本 v1；未来用显式 `migrateSave(fromVersion, raw)` 链升级。
+- 存档 v2（M2 交战快照 + 确定性回放）：见 [ADR-006](../decisions/ADR-006-SAVE-V2.md)，schemaVersion 升 2，由 M2-C/持久化实现。
 
 ## 实时与降级（`packages/realtime/src`）
 
