@@ -1,7 +1,7 @@
 import { DEMO_V1_CONTENT } from '@fleet-campaign/content'
 import { createInitialState, createSessionLedger, makeReceiptKey, recordReceipt, reduceCommand, type GameState, type SeatId } from '@fleet-campaign/domain'
 import { isValidIdempotencyKey, projectGame, validateCommandIntent, type BroadcastEvent, type CommandIntent, type CommandResult, type ProtocolErrorCode, type Snapshot } from '@fleet-campaign/protocol'
-import { generateSessionToken, sessionTokenFingerprint, type ClientToHostFrame, type HostTransport } from '@fleet-campaign/realtime'
+import { generateSessionToken, randomUrlSafe, sessionTokenFingerprint, type ClientToHostFrame, type HostTransport } from '@fleet-campaign/realtime'
 
 import { generateCampaignId, generateRoomId } from './ids'
 
@@ -10,16 +10,29 @@ interface Binding { clientId: string; role: Role; seat: SeatId | null; tokenFing
 export type HostSessionStatus = 'starting' | 'open' | 'closed' | 'transport_unavailable'
 export interface HostSessionOptions { hostTransport: HostTransport; hostClientId: string }
 
+/** 房主侧只读视图，供 UI 渲染与存档构建使用。 */
+export interface HostSessionView {
+  status: HostSessionStatus
+  roomId: string
+  campaignId: string
+  seed: string
+  hasPlayer: boolean
+  snapshot: Snapshot | null
+  roster: Snapshot['roster']
+}
+
 /** Application composition for host authority. Transport frames are validated before reducer access. */
 export class HostSessionController {
   public status: HostSessionStatus = 'starting'
   private roomId = ''
   private campaignId = ''
+  private seed = ''
   private game: GameState | null = null
   private ledger = createSessionLedger<CommandResult>()
   private readonly bindings = new Map<string, Binding>()
   private readonly revokedTokens = new Map<string, string>()
   private hostCommandCounter = 0
+  private readonly listeners = new Set<() => void>()
 
   public constructor(private readonly options: HostSessionOptions) {
     options.hostTransport.setEvents({
@@ -41,11 +54,14 @@ export class HostSessionController {
     if (!initial.ok) throw new Error('command_invalid')
     this.roomId = generateRoomId()
     this.campaignId = generateCampaignId()
+    this.seed = randomUrlSafe(16)
     this.game = initial.state
     this.ledger = createSessionLedger()
+    this.hostCommandCounter = 0
     const hostToken = generateSessionToken()
     this.bindings.set(this.options.hostClientId, { clientId: this.options.hostClientId, role: 'host', seat: 'host', tokenFingerprint: sessionTokenFingerprint(hostToken), connectionId: 'host' })
     this.options.hostTransport.open(this.roomId)
+    this.changed()
     return { roomId: this.roomId, campaignId: this.campaignId }
   }
 
@@ -54,7 +70,38 @@ export class HostSessionController {
     if (!host) throw new Error('room_not_found')
     this.hostCommandCounter += 1
     const key = `${command === 'start-demo' ? 's' : 'a'}${this.hostCommandCounter.toString(36)}`.padEnd(22, 'x')
-    return this.handleIntent(host, { protocolVersion: 1, messageId: 'host-command', roomId: this.roomId, senderClientId: host.clientId, kind: 'command-intent', idempotencyKey: key, expectedEventSequence: this.ledger.sequence, command: { type: command } })
+    const result = this.handleIntent(host, { protocolVersion: 1, messageId: 'host-command', roomId: this.roomId, senderClientId: host.clientId, kind: 'command-intent', idempotencyKey: key, expectedEventSequence: this.ledger.sequence, command: { type: command } })
+    this.changed()
+    return result
+  }
+
+  /** 从已确认存档恢复对局：替换领域状态、种子与战役档，账本按新房间重建。 */
+  public resume(state: GameState, seed: string, campaignId: string): void {
+    if (this.status !== 'open') throw new Error('room_not_found')
+    this.game = state
+    this.seed = seed
+    this.campaignId = campaignId
+    this.ledger = createSessionLedger()
+    this.changed()
+  }
+
+  /** 只读视图（房主可见性快照 + 名单 + 种子）。 */
+  public getView(): HostSessionView {
+    return {
+      status: this.status,
+      roomId: this.roomId,
+      campaignId: this.campaignId,
+      seed: this.seed,
+      hasPlayer: [...this.bindings.values()].some((binding) => binding.role === 'player'),
+      snapshot: this.game ? this.snapshot('host') : null,
+      roster: [...this.bindings.values()].map((binding) => ({ clientId: binding.clientId, seat: binding.seat ?? 'guest', role: binding.role })),
+    }
+  }
+
+  /** 订阅状态变更（创建/裁决/加入/离开/关闭/恢复）。 */
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
   }
 
   public closeRoom(): void {
@@ -67,11 +114,12 @@ export class HostSessionController {
     this.options.hostTransport.close()
     this.bindings.clear()
     this.revokedTokens.clear()
+    this.changed()
   }
 
   private receive(connectionId: string, frame: ClientToHostFrame): void {
-    if (frame.frame === 'join-request') { this.join(connectionId, frame); return }
-    if (frame.frame === 'leave-request') { this.leave(connectionId, frame); return }
+    if (frame.frame === 'join-request') { this.join(connectionId, frame); this.changed(); return }
+    if (frame.frame === 'leave-request') { this.leave(connectionId, frame); this.changed(); return }
     const valid = validateCommandIntent(frame.intent)
     if (!valid.ok) { this.sendResult(connectionId, this.reject(this.safeIdempotencyKey(frame.intent?.idempotencyKey), frame.clientId, 'protocol_invalid')); return }
     if (frame.roomId !== this.roomId || valid.value.roomId !== this.roomId) {
@@ -87,6 +135,7 @@ export class HostSessionController {
     const result = this.handleIntent(binding, valid.value)
     this.sendResult(connectionId, result)
     if (!result.accepted && result.errorCode === 'state_conflict') this.sendSnapshot(connectionId, binding)
+    this.changed()
   }
 
   private leave(connectionId: string, frame: Extract<ClientToHostFrame, { frame: 'leave-request' }>): void {
@@ -180,6 +229,10 @@ export class HostSessionController {
   private recordRejected(key: string, idempotencyKey: string, senderClientId: string, errorCode: ProtocolErrorCode): CommandResult { const result = this.reject(idempotencyKey, senderClientId, errorCode); this.ledger = recordReceipt(this.ledger, key, result); return result }
   private reject(idempotencyKey: string, senderClientId: string, errorCode: ProtocolErrorCode): CommandResult { return { protocolVersion: 1, messageId: 'command-result', roomId: this.roomId, senderClientId, kind: 'command-result', idempotencyKey, accepted: false, errorCode, messageKey: errorCode, sequence: this.ledger.sequence } }
   private eventFor(event: { type: string; actorSeat: SeatId }, eventSequence: number): BroadcastEvent { const targetSeat = event.actorSeat === 'host' ? 'guest' : 'host'; const target = this.game?.units.find((u) => u.id === `${targetSeat}-unit`); if (event.type === 'demo-started') return { protocolVersion: 1, roomId: this.roomId, eventSequence, eventId: `e_${eventSequence}`, type: 'demo-started', actorSeat: event.actorSeat, publicPayload: { round: this.game?.round ?? 1, activeSeat: 'host' } }; if (event.type === 'demo-completed') return { protocolVersion: 1, roomId: this.roomId, eventSequence, eventId: `e_${eventSequence}`, type: 'demo-completed', actorSeat: event.actorSeat, publicPayload: { winnerSeat: event.actorSeat } }; return { protocolVersion: 1, roomId: this.roomId, eventSequence, eventId: `e_${eventSequence}`, type: 'action-confirmed', actorSeat: event.actorSeat, publicPayload: { targetSeat, targetIntegrity: target?.integrity ?? 0 } } }
+
+  private changed(): void {
+    for (const listener of this.listeners) listener()
+  }
 }
 
 export function createHostSession(options: HostSessionOptions): HostSessionController { return new HostSessionController(options) }

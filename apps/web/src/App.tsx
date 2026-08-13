@@ -1,15 +1,33 @@
-import './App.css'
+import { useState } from 'react'
 
-export const pageStatusText = '房间基础工程准备中'
+import { useI18n, useClientLangSync } from './i18n'
+import { HomeScreen, type HomeAction } from './ui/HomeScreen'
+import { HostRoom } from './ui/HostRoom'
+import { JoinRoom } from './ui/JoinRoom'
+import { DemoMode } from './ui/DemoMode'
 
 export function App() {
+  const { t, lang, setLang } = useI18n()
+  useClientLangSync()
+  const [mode, setMode] = useState<HomeAction | null>(null)
+
   return (
     <main className="page">
-      <section className="status-card" aria-labelledby="page-title">
-        <p className="eyebrow">FLEET CAMPAIGN</p>
-        <h1 id="page-title">{pageStatusText}</h1>
-        <p>正式项目的工作区、质量门禁与静态部署基线已经就绪。</p>
-      </section>
+      <div className="app-bar">
+        <span className="eyebrow">{t('app.title')}</span>
+        <button className="lang-toggle" onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}>
+          {lang === 'zh' ? 'EN' : '中文'}
+        </button>
+      </div>
+      {mode === null ? (
+        <HomeScreen onSelect={setMode} />
+      ) : mode === 'host' ? (
+        <HostRoom onExit={() => setMode(null)} />
+      ) : mode === 'join' ? (
+        <JoinRoom onExit={() => setMode(null)} />
+      ) : (
+        <DemoMode onExit={() => setMode(null)} />
+      )}
     </main>
   )
 }

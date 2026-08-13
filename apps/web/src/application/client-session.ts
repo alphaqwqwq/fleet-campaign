@@ -61,6 +61,7 @@ export class ClientSessionController {
   private requestedRole: RequestedRole = 'spectator'
   private token: string | null = null
   private leaveAcknowledged: (() => void) | null = null
+  private readonly listeners = new Set<() => void>()
 
   constructor(private readonly options: ClientSessionOptions) {
     this.token = options.resumeToken ?? null
@@ -70,22 +71,31 @@ export class ClientSessionController {
     })
   }
 
+  /** 订阅视图变更（连接状态、快照、裁决结果、错误）。 */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+
   connect(roomId: string, role: RequestedRole): void {
     this.roomId = roomId
     this.requestedRole = role
     this.view.status = 'connecting'
     this.view.lastError = null
     this.options.clientTransport.connect(roomId)
+    this.changed()
   }
 
   reconnect(): void {
     if (!this.roomId || !this.token) {
       this.view.status = 'closed'
       this.view.lastError = { code: 'identity_invalid', messageKey: 'realtime.identity_invalid' }
+      this.changed()
       return
     }
     this.view.status = 'reconnecting'
     this.options.clientTransport.connect(this.roomId)
+    this.changed()
   }
 
   sendCommandIntent(command: 'start-demo' | 'advance', idempotencyKey: string): boolean {
@@ -115,6 +125,7 @@ export class ClientSessionController {
       this.options.clientTransport.close()
       this.token = null
       this.view.status = 'closed'
+      this.changed()
       return true
     }
 
@@ -146,6 +157,7 @@ export class ClientSessionController {
     this.options.clientTransport.close()
     this.token = null
     this.view.status = 'closed'
+    this.changed()
     return true
   }
 
@@ -230,6 +242,11 @@ export class ClientSessionController {
       case 'broadcast-event':
         break
     }
+    this.changed()
+  }
+
+  private changed(): void {
+    for (const listener of this.listeners) listener()
   }
 
   private messageId(): string {
