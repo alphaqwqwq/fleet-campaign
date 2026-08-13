@@ -9,6 +9,8 @@ import type { GameView, Snapshot } from '@fleet-campaign/protocol'
 import {
   createClientPeerJsTransport,
   createHostPeerJsTransport,
+  createRelayClientTransport,
+  createRelayHostTransport,
   type ClientTransport,
   type HostTransport,
 } from '@fleet-campaign/realtime'
@@ -40,13 +42,36 @@ export function clearResumeToken(roomId: string): void {
   globalThis.sessionStorage?.removeItem(TOKEN_KEY_PREFIX + roomId)
 }
 
-/** 真实 PeerJS/WebRTC 传输（事件由会话控制器接管后重设）。 */
+/**
+ * 真实传输（ADR-005）：默认 Vercel 轮询中继（同源 /api/relay）；
+ * 加 `?transport=peerjs` 查询参数可回退到 PeerJS 直连。
+ */
+function relayBaseUrl(): string {
+  const origin = globalThis.location?.origin
+  return origin ? `${origin}/api/relay` : ''
+}
+
+function transportMode(): 'relay' | 'peerjs' {
+  return new URLSearchParams(globalThis.location?.search ?? '').get('transport') === 'peerjs' ? 'peerjs' : 'relay'
+}
+
 export function createHostTransport(): HostTransport {
-  return createHostPeerJsTransport({ onOpen: () => {}, onClose: () => {}, onClientConnect: () => {}, onClientDisconnect: () => {}, onFrame: () => {}, onUnavailable: () => {} })
+  const mode = transportMode()
+  if (mode === 'peerjs') {
+    return createHostPeerJsTransport({ onOpen: () => {}, onClose: () => {}, onClientConnect: () => {}, onClientDisconnect: () => {}, onFrame: () => {}, onUnavailable: () => {} })
+  }
+  return createRelayHostTransport(
+    { onOpen: () => {}, onClose: () => {}, onClientConnect: () => {}, onClientDisconnect: () => {}, onFrame: () => {}, onUnavailable: () => {} },
+    { baseUrl: relayBaseUrl() },
+  )
 }
 
 export function createClientTransport(): ClientTransport {
-  return createClientPeerJsTransport({ onStatus: () => {}, onFrame: () => {} })
+  const mode = transportMode()
+  if (mode === 'peerjs') {
+    return createClientPeerJsTransport({ onStatus: () => {}, onFrame: () => {} })
+  }
+  return createRelayClientTransport({ onStatus: () => {}, onFrame: () => {} }, { baseUrl: relayBaseUrl() })
 }
 
 /** 浏览器本地存档（IndexedDB 由 LocalStorageCampaignStore 经 StorageLike 注入）。 */
