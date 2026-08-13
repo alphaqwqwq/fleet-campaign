@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import type { BattleGroupState, BattleShipState, BattleState, BattleWeaponState } from '@fleet-campaign/battle'
 
@@ -7,6 +7,7 @@ import { ARCHETYPE_LABEL, deriveBotState } from '@fleet-campaign/battle'
 import { useBattleController } from '../application/use-battle-controller'
 import { useI18n } from '../i18n'
 import { describeBattleEvent } from './battle-events'
+import { HoloMapCanvas } from './HoloMapCanvas'
 
 export const BAND_NAMES = ['至近', '近', '坍缩', '瞄准镜', '长', '极限'] as const
 
@@ -34,11 +35,11 @@ function weaponCounters(weapon: BattleWeaponState): string[] {
   return pips
 }
 
-function ShipCard({ ship, self }: { ship: BattleShipState; self: boolean }) {
+function ShipCard({ ship, self, onSelect, selected }: { ship: BattleShipState; self: boolean; onSelect?: () => void; selected?: boolean }) {
   const color = self ? '#59d8ff' : '#ffb34d'
   const hpRatio = ship.maxHp > 0 ? ship.hp / ship.maxHp : 0
   return (
-    <div className={`b-ship ${ship.status !== 'active' ? 'down' : ''}`}>
+    <div className={`b-ship ${ship.status !== 'active' ? 'down' : ''} ${selected ? 'sel' : ''}`} onClick={onSelect}>
       <div className="b-ship-head">
         <span className="b-ship-name" style={{ color }}>
           {ship.id}
@@ -66,7 +67,23 @@ function ShipCard({ ship, self }: { ship: BattleShipState; self: boolean }) {
   )
 }
 
-function FleetPanel({ title, group, self, state, showBot }: { title: string; group: BattleGroupState; self: boolean; state: BattleState; showBot?: boolean }) {
+function FleetPanel({
+  title,
+  group,
+  self,
+  state,
+  showBot,
+  selectedShipId,
+  onSelectShip,
+}: {
+  title: string
+  group: BattleGroupState
+  self: boolean
+  state: BattleState
+  showBot?: boolean
+  selectedShipId: string | null
+  onSelectShip: (shipId: string) => void
+}) {
   const archetype =
     showBot && group.status === 'active' ? ` · bot ${ARCHETYPE_LABEL[deriveBotState(state, group.id).archetype]}` : ''
   return (
@@ -80,54 +97,77 @@ function FleetPanel({ title, group, self, state, showBot }: { title: string; gro
         <span className="b-chip">阻滞 {group.blockDice}d6</span>
         <span className="b-chip">{group.status}</span>
       </div>
-      <ShipCard ship={group.flagship} self={self} />
+      <ShipCard ship={group.flagship} self={self} selected={selectedShipId === group.flagship.id} onSelect={() => onSelectShip(group.flagship.id)} />
       {group.ships.map((ship) => (
-        <ShipCard key={ship.id} ship={ship} self={self} />
+        <ShipCard key={ship.id} ship={ship} self={self} selected={selectedShipId === ship.id} onSelect={() => onSelectShip(ship.id)} />
       ))}
     </div>
   )
 }
 
-function BandTrack({ state }: { state: BattleState }) {
-  const player = state.battleGroups.find((g) => g.faction === 'player')
-  const enemy = state.battleGroups.find((g) => g.faction === 'enemy')
-  // 左→右：极限(5) → 至近(0)，前进 = 数字减小。
-  const order = [5, 4, 3, 2, 1, 0]
-  return (
-    <div className="b-map">
-      <div className="b-band-track">
-        {order.map((band) => {
-          const on = player?.distance === band || enemy?.distance === band
-          return (
-            <div key={band} className={`b-band ${on ? 'on' : ''}`}>
-              <span className="b-band-name">{band} {bandName(band)}</span>
-              {player?.distance === band ? <span className="b-marker self" title="我方">●</span> : null}
-              {enemy?.distance === band ? <span className="b-marker enemy" title="敌方">●</span> : null}
-            </div>
-          )
-        })}
-      </div>
-      <div className="b-map-hint">
-        越靠右越近 · 我方青 / 敌方琥珀
-      </div>
-    </div>
-  )
-}
+/** 指令坞状态：null=空闲；对象=索敌模式（点敌方舰后提交该命令）。 */
+type Targeting = { command: 'full-thrust-fire' | 'all-guns-fire' | 'lock-on'; weaponId?: string } | null
 
 export function BattleMode({ onExit }: { onExit: () => void }) {
   const { t } = useI18n()
   const controller = useBattleController()
   const { state, events } = controller
+  const [selectedShipId, setSelectedShipId] = useState<string | null>(null)
+  const [targeting, setTargeting] = useState<Targeting>(null)
 
   const player = state.battleGroups.find((g) => g.faction === 'player')
   const enemy = state.battleGroups.find((g) => g.faction === 'enemy')
   const myTurn = state.phase === 'action' && state.activeGroupId === player?.id
   const completed = state.phase === 'completed'
-
   const eventLog = useMemo(() => events.map(describeBattleEvent), [events])
 
   const playerGroup = player!
   const enemyGroup = enemy!
+
+  const selectedPlayerShip = playerGroup
+    ? [playerGroup.flagship, ...playerGroup.ships].find((s) => s.id === selectedShipId) ?? null
+    : null
+
+  /** 所选舰可发射的武器（非充能；充能走弹着）。 */
+  const firableWeapons = selectedPlayerShip
+    ? selectedPlayerShip.weapons.filter((w) => w.charge === null && playerGroup.distance <= w.range)
+    : []
+
+  function targetingLabel(): string | null {
+    if (!targeting) return null
+    if (targeting.command === 'full-thrust-fire') return `索敌：全速前进攻击（${targeting.weaponId ?? '主武器'}）→ 点敌方`
+    if (targeting.command === 'all-guns-fire') return '索敌：全舰开火 → 点敌方'
+    return '索敌：锁定 → 点敌方'
+  }
+
+  function handleTargetShip(shipId: string, groupId: string): void {
+    if (!targeting) return
+    if (targeting.command === 'full-thrust-fire') {
+      controller.submit({
+        type: 'maneuver',
+        actorId: 'player',
+        battleGroupId: playerGroup.id,
+        maneuver: 'full-thrust',
+        attacks: [{ weaponId: targeting.weaponId!, target: { groupId, shipId } }],
+      })
+    } else if (targeting.command === 'all-guns-fire') {
+      // 1 超重 或 至多 2 不同武器。
+      const superheavy = firableWeapons.find((w) => w.size === 'superheavy')
+      const attacks = superheavy
+        ? [{ weaponId: superheavy.weaponId, target: { groupId, shipId } }]
+        : firableWeapons.slice(0, 2).map((w) => ({ weaponId: w.weaponId, target: { groupId, shipId } }))
+      controller.submit({
+        type: 'maneuver',
+        actorId: 'player',
+        battleGroupId: playerGroup.id,
+        maneuver: 'all-guns-fire',
+        attacks,
+      })
+    } else {
+      controller.submit({ type: 'tactic', actorId: 'player', battleGroupId: playerGroup.id, tactic: 'lock-on', target: { groupId, shipId } })
+    }
+    setTargeting(null)
+  }
 
   return (
     <section className="battle">
@@ -149,9 +189,24 @@ export function BattleMode({ onExit }: { onExit: () => void }) {
       </header>
 
       <div className="b-body">
-        <FleetPanel title="我方" group={playerGroup} self state={state} />
+        <FleetPanel
+          title="我方"
+          group={playerGroup}
+          self
+          state={state}
+          selectedShipId={selectedShipId}
+          onSelectShip={(id) => setSelectedShipId(id)}
+        />
         <div className="b-stage">
-          <BandTrack state={state} />
+          <HoloMapCanvas
+            state={state}
+            selectedShipId={selectedShipId}
+            targetingLabel={targetingLabel()}
+            pendingEvents={events}
+            onSelectShip={(id) => setSelectedShipId(id)}
+            onTargetShip={handleTargetShip}
+          />
+
           <div className="b-dock">
             <div className="b-dock-status">
               {completed
@@ -164,29 +219,49 @@ export function BattleMode({ onExit }: { onExit: () => void }) {
               {controller.lastRejection ? <span className="b-reject"> · 拒绝：{controller.lastRejection}</span> : null}
             </div>
 
-            {!completed && state.phase === 'action' && myTurn ? (
+            {targeting ? (
+              <div className="b-dock-cmds">
+                <span className="b-cmd-label">{targetingLabel()}</span>
+                <button className="b-cmd" onClick={() => setTargeting(null)}>取消</button>
+              </div>
+            ) : null}
+
+            {!completed && state.phase === 'action' && myTurn && !targeting ? (
               <div className="b-dock-cmds">
                 <span className="b-cmd-label">机动</span>
-                <button className="b-cmd" onClick={() => controller.submit({ type: 'maneuver', actorId: 'player', battleGroupId: playerGroup.id, maneuver: 'full-thrust', attacks: [] })}>
-                  全速前进
+                <button
+                  className="b-cmd"
+                  disabled={!firableWeapons.some((w) => w.size === 'main')}
+                  onClick={() =>
+                    setTargeting({ command: 'full-thrust-fire', weaponId: firableWeapons.find((w) => w.size === 'main')?.weaponId })
+                  }
+                >
+                  全速前进·主炮
                 </button>
                 <button
                   className="b-cmd"
-                  onClick={() =>
-                    controller.submit({ type: 'maneuver', actorId: 'player', battleGroupId: playerGroup.id, maneuver: 'all-guns-fire', attacks: [] })
-                  }
+                  disabled={!firableWeapons.some((w) => w.size === 'superheavy') && firableWeapons.length < 2}
+                  onClick={() => setTargeting({ command: 'all-guns-fire' })}
                 >
                   全舰开火
                 </button>
                 <button
                   className="b-cmd"
-                  onClick={() =>
-                    controller.submit({ type: 'maneuver', actorId: 'player', battleGroupId: playerGroup.id, maneuver: 'retro-thrust', retreat: true })
-                  }
+                  onClick={() => controller.submit({ type: 'maneuver', actorId: 'player', battleGroupId: playerGroup.id, maneuver: 'retro-thrust', retreat: true })}
                 >
                   反向喷射
                 </button>
                 <span className="b-cmd-label">战术</span>
+                <button className="b-cmd" onClick={() => setTargeting({ command: 'lock-on' })}>
+                  锁定
+                </button>
+                <button
+                  className="b-cmd"
+                  onClick={() => controller.submit({ type: 'tactic', actorId: 'player', battleGroupId: playerGroup.id, tactic: 'careful-fire' })}
+                >
+                  谨慎射击
+                </button>
+                <span className="b-cmd-label">回合</span>
                 <button className="b-cmd" onClick={() => controller.submit({ type: 'end-turn', actorId: 'player', battleGroupId: playerGroup.id })}>
                   结束回合
                 </button>
@@ -216,7 +291,15 @@ export function BattleMode({ onExit }: { onExit: () => void }) {
             ) : null}
           </div>
         </div>
-        <FleetPanel title="敌方" group={enemyGroup} self={false} state={state} showBot />
+        <FleetPanel
+          title="敌方"
+          group={enemyGroup}
+          self={false}
+          state={state}
+          showBot
+          selectedShipId={selectedShipId}
+          onSelectShip={(id) => setSelectedShipId(id)}
+        />
       </div>
 
       <div className="b-log">
