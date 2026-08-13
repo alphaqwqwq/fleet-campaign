@@ -10,6 +10,7 @@
 | `ARCHITECTURE.md` | 包边界、依赖方向、组合层、测试策略 |
 | `decisions/` | ADR 决策日志（跨契约变更的背景、决定、后果） |
 | `reference/SPEC.md` | 现行产品契约：demo-v1 循环、协议 v1、存档 v1、实时降级 |
+| `reference/PLAYBOOK-CICD.md` | 网页发布实测经验：门禁、Vercel/DNS/HTTPS、多网络验收、坑 |
 
 ## 文档优先级
 
