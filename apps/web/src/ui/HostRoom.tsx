@@ -23,6 +23,7 @@ export function HostRoom({ onExit }: { onExit: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [, setTick] = useState(0)
   const [events, setEvents] = useState<string[]>([])
+  const lastEventSequence = useRef(-1)
   const [saves, setSaves] = useState<CampaignSave[]>([])
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
@@ -30,7 +31,14 @@ export function HostRoom({ onExit }: { onExit: () => void }) {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    const unsubscribe = host.subscribe(() => setTick((next) => next + 1))
+    const unsubscribe = host.subscribe(() => {
+      const lastEvent = host.getView().lastEvent
+      if (lastEvent && lastEvent.eventSequence !== lastEventSequence.current) {
+        lastEventSequence.current = lastEvent.eventSequence
+        setEvents((prev) => [...prev, describeEvent(lastEvent)])
+      }
+      setTick((next) => next + 1)
+    })
     const created = host.createRoom()
     setRoomId(created.roomId)
     void refreshSaves()
@@ -54,8 +62,7 @@ export function HostRoom({ onExit }: { onExit: () => void }) {
   }
 
   function submit(command: 'start-demo' | 'advance'): void {
-    const result = host.hostSubmit(command)
-    if (result.accepted && result.event) setEvents((prev) => [...prev, describeEvent(result.event)])
+    host.hostSubmit(command)
     setTick((next) => next + 1)
   }
 

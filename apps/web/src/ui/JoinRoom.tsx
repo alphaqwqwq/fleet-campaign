@@ -53,10 +53,10 @@ export function JoinRoom({ onExit }: { onExit: () => void }) {
       onToken: (token) => writeResumeToken(code, token),
     })
     session.subscribe(() => {
-      const result = session.view.lastResult
-      if (result && result.accepted && result.event && result.event.eventSequence !== lastEventSequence.current) {
-        lastEventSequence.current = result.event.eventSequence
-        setEvents((prev) => [...prev, describeEvent(result.event)])
+      const broadcast = session.view.lastBroadcast
+      if (broadcast && broadcast.eventSequence !== lastEventSequence.current) {
+        lastEventSequence.current = broadcast.eventSequence
+        setEvents((prev) => [...prev, describeEvent(broadcast)])
       }
       setTick((next) => next + 1)
     })

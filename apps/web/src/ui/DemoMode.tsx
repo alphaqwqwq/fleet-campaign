@@ -32,7 +32,8 @@ function DemoBoard() {
   const ref = useRef<{ host: HostSessionController; guest: ClientSessionController } | null>(null)
   const [hostEvents, setHostEvents] = useState<string[]>([])
   const [guestEvents, setGuestEvents] = useState<string[]>([])
-  const lastEventSequence = useRef(-1)
+  const hostLastSequence = useRef(-1)
+  const guestLastSequence = useRef(-1)
 
   useEffect(() => {
     const hostTransport = createMemoryHostTransport()
@@ -40,12 +41,19 @@ function DemoBoard() {
     const created = host.createRoom()
     const guestTransport = connectMemoryClient(hostTransport)
     const guest = createClientSession({ clientTransport: guestTransport, clientId: generateClientId(), onToken: () => {} })
-    const unsubHost = host.subscribe(() => setTick((next) => next + 1))
+    const unsubHost = host.subscribe(() => {
+      const lastEvent = host.getView().lastEvent
+      if (lastEvent && lastEvent.eventSequence !== hostLastSequence.current) {
+        hostLastSequence.current = lastEvent.eventSequence
+        setHostEvents((prev) => [...prev, describeEvent(lastEvent)])
+      }
+      setTick((next) => next + 1)
+    })
     const unsubGuest = guest.subscribe(() => {
-      const result = guest.view.lastResult
-      if (result?.accepted && result.event && result.event.eventSequence !== lastEventSequence.current) {
-        lastEventSequence.current = result.event.eventSequence
-        setGuestEvents((prev) => [...prev, describeEvent(result.event)])
+      const broadcast = guest.view.lastBroadcast
+      if (broadcast && broadcast.eventSequence !== guestLastSequence.current) {
+        guestLastSequence.current = broadcast.eventSequence
+        setGuestEvents((prev) => [...prev, describeEvent(broadcast)])
       }
       setTick((next) => next + 1)
     })
@@ -63,8 +71,7 @@ function DemoBoard() {
   const guestView = ref.current?.guest.view ?? null
 
   function hostSubmit(command: 'start-demo' | 'advance'): void {
-    const result = ref.current?.host.hostSubmit(command)
-    if (result?.accepted && result.event) setHostEvents((prev) => [...prev, describeEvent(result.event)])
+    ref.current?.host.hostSubmit(command)
   }
 
   return (
