@@ -1,6 +1,6 @@
 import { buildBattleContent, type BattleContent, type BattleGroupBuild } from '@fleet-campaign/content'
 
-import { createSeededRng, isEngagementOver, markEliminatedGroups, reduceCommand, startEngagement } from './index'
+import { ARCHETYPE_LABEL, createSeededRng, decideBotCommands, deriveBotState, isEngagementOver, markEliminatedGroups, reduceCommand, startEngagement } from './index'
 import type { BattleCommand, BattleEvent, BattleGroupState, BattleState } from './types'
 
 /**
@@ -51,11 +51,12 @@ function shipLabel(group: BattleGroupState, shipId: string): string {
   return ship ? ship.id : shipId
 }
 
-function describeGroup(group: BattleGroupState): string {
+function describeGroup(state: BattleState, group: BattleGroupState): string {
   const ships = [group.flagship, ...group.ships]
     .map((s) => `${s.id}(${s.hp}/${s.maxHp}${s.status === 'active' ? '' : '/' + s.status})`)
     .join(' ')
-  return `[${group.id} ${group.faction} 带${group.distance} 阻滞${group.blockDice}d6 ${ships}]`
+  const archetype = `  [bot: ${ARCHETYPE_LABEL[deriveBotState(state, group.id).archetype]}]`
+  return `[${group.id} ${group.faction} 带${group.distance} 阻滞${group.blockDice}d6 ${ships}]${archetype}`
 }
 
 function describeEvent(state: BattleState, event: BattleEvent): string {
@@ -119,42 +120,9 @@ function describeEvent(state: BattleState, event: BattleEvent): string {
   }
 }
 
-/** 脚本化策略：回合制交替，机动 + 开火（玩家方先手）。 */
+/** 脚本化策略：回合制交替，机动 + 开火（玩家方先手）。由 M2-D 状态机 bot 驱动。 */
 function scriptTurn(state: BattleState, groupId: string): BattleCommand[] {
-  const group = state.battleGroups.find((g) => g.id === groupId)
-  if (!group || group.status !== 'active') return []
-  const enemy = state.battleGroups.find((g) => g.id !== groupId && g.status === 'active')
-  if (!enemy) return []
-
-  const commands: BattleCommand[] = []
-  const maneuver: BattleCommand = {
-    type: 'maneuver',
-    actorId: group.controller,
-    battleGroupId: group.id,
-    maneuver: 'full-thrust',
-  }
-  const fire: BattleCommand = {
-    type: 'maneuver',
-    actorId: group.controller,
-    battleGroupId: group.id,
-    maneuver: 'full-thrust',
-    attacks: [],
-  }
-  const allWeapons = [group.flagship, ...group.ships].flatMap((s) => s.weapons)
-  const targetShip = enemy.flagship.status === 'active' ? enemy.flagship.id : enemy.ships.find((s) => s.status === 'active')?.id
-  if (targetShip) {
-    // full-thrust 只能发 1 主武器（非充能，充能留给弹着阶段）。
-    const weapon = allWeapons.find((w) => w.charge === null && w.size === 'main' && group.distance <= w.range)
-    if (weapon) {
-      fire.attacks = [{ weaponId: weapon.weaponId, target: { groupId: enemy.id, shipId: targetShip } }]
-      commands.push(fire)
-    } else {
-      commands.push(maneuver)
-    }
-  } else {
-    commands.push(maneuver)
-  }
-  return commands
+  return decideBotCommands(state, groupId)
 }
 
 /** 脚本化整场交战，返回最终状态与事件流。一方战果达成即结束。 */
@@ -255,7 +223,7 @@ export function formatSimulation(content: BattleContent, options: SimOptions): s
   lines.push(`seed=${options.seed.toString()}  content=${content.contentId}  maxRounds=${options.maxRounds ?? 8}`)
   lines.push('')
   for (const group of state.battleGroups) {
-    lines.push(describeGroup(group))
+    lines.push(describeGroup(state, group))
   }
   lines.push('')
   for (const event of events) {
@@ -264,7 +232,7 @@ export function formatSimulation(content: BattleContent, options: SimOptions): s
   }
   lines.push('')
   lines.push(`最终：rngIndex=${state.rngIndex}`)
-  for (const group of state.battleGroups) lines.push(describeGroup(group))
+  for (const group of state.battleGroups) lines.push(describeGroup(state, group))
   if (state.phase === 'completed') {
     lines.push(`战果：${state.outcome}`)
   } else {

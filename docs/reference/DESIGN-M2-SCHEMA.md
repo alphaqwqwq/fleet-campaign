@@ -173,6 +173,17 @@ Weapon:    { id, size: secondary/main/superheavy, tags: [charge:N|payload:N|relo
 - 旗舰加成在构筑层应用：+3 HP / +1 阻滞骰 / +1 系统槽。
 - 人工验证：`npm run battle:sim` 控制台沙盒，固定种子跑整场交战并批量打印阶段/骰子/事件/战果（确定性可复现）。
 
+### M2-D NPC 状态机 bot（本轮实现）
+
+- `packages/battle/src/bot.ts`：无内部记忆的**派生有限状态机**——每决策回合从领域状态推导 FSM 相位，映射为命令；确定性、不引入随机数。
+- 按战斗群**主导舰种**分档（全舰按 type 计数取最多者）：
+  - `battleship-line` 战列线：逼近 0–2 带，全舰开火（超重/双武器齐射）。
+  - `carrier-kite` 航母风筝：维持 3–4 带放风筝，酬载/主炮持续压制，被贴近则拉远。
+  - `frigate-screen` 巡防屏卫：保持 2–3 带灵活进退。
+- 撤退判断：临界点（第 5 轮）后，己方旗舰血量 <34% 且敌方旗舰仍在 → `declare-retreat`。
+- 接入 `battle:sim`（双方均走 bot）；`battle:sim` 输出标注各战斗群 bot 分档。
+- 增援 / 任务条件 bot 后置（随 M2-C 任务链落地）。
+
 ## 9. 验收（M2-A 完成定义）
 
 1. `start-engagement` → `advance-phase` 全轮次（logistics→ballistics→action→boarding→round+1）可确定性走通。
