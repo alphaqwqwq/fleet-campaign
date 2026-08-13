@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "verify:governance": "node scripts/verify-governance.mjs",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p api",
     "lint": "eslint .",
     "test": "vitest run",
     "build": "npm run build --workspace @fleet-campaign/web"
@@ -21,5 +21,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.3",
     "vitest": "^4.0.8"
+  },
+  "dependencies": {
+    "@vercel/kv": "^3.0.0"
   }
 }

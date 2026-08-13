@@ -11,7 +11,7 @@
 | `packages/domain` | 纯规则：`GameState`、`reduceCommand`、`ledger`、`rng` | `content` 类型 | UI、协议实现、存储、网络、时间、LLM |
 | `packages/protocol` | protocol v1：信封、命令意图、结果、快照投影、错误码 | `domain` 公开类型 | React、PeerJS、IndexedDB、业务结算 |
 | `packages/persistence` | 存档 v1：编码、导入导出校验、迁移、存储端口 | `protocol` | UI 调用、领域结算、令牌/连接持久化 |
-| `packages/realtime` | 传输抽象：`HostTransport`/`ClientTransport`、帧校验、令牌；PeerJS 适配 + 内存替身 | `protocol` | 规则结算、快照篡改、身份授权决策 |
+| `packages/realtime` | 传输抽象：`HostTransport`/`ClientTransport`、帧校验、令牌；默认 Vercel 轮询中继（ADR-005），另有内存替身与 PeerJS 备选 | `protocol` | 规则结算、快照篡改、身份授权决策 |
 | `apps/web/src/application` | 组合层（**唯一**可多包依赖处）：`host-session`/`client-session` 编排、授权检查、持久化调用 | 上述所有包 | 在组件外泄露令牌、绕过协议/领域 |
 | `apps/web/src/ui` | 渲染、输入、可访问性 | `application` | 直接改状态、直接访问存储/传输 |
 

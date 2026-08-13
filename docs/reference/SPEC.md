@@ -43,12 +43,14 @@
 
 ## 实时与降级（`packages/realtime/src`）
 
-- 传输抽象 `HostTransport` / `ClientTransport` + 帧校验；PeerJS 适配（`peerjs-adapter.ts`）与 `MemoryHostTransport`（无网络测试替身）同接口。
+- 传输抽象 `HostTransport` / `ClientTransport` + 帧校验；默认 **Vercel 轮询中继**（ADR-005：同源 `/api/relay` 函数 + KV，HTTP 轮询，无 WebSocket/NAT/外部信令依赖），`MemoryHostTransport` 为无网络测试替身，PeerJS 适配为 `?transport=peerjs` 备选。
+- 中继只存转发帧、不解析不裁决（房主仍是唯一权威）；每房间追加式日志 + 游标轮询，默认 500ms。
 - 建连：房主建端点 → 加入者请求 `player | spectator` → 房主签发令牌绑定角色 → 下发完整快照 → 后续只走 `command-intent` / `command-result`。
 - 重连 = 同一 `clientId` + 仍有效令牌重建立传输，下发完整快照；令牌失效/房主关闭视为新加入/会话结束。
 - 重复连接：以最后通过令牌校验的连接为有效，旧连接收到 `duplicate_connection`。
 - 观战：收同玩家公开快照与事件，但协议与应用服务拒绝其任何改变状态命令（`forbidden_role`）。
 - 房主关闭：广播 `room-closed`（可用时）并销毁端点；提供"保存后新建房间"降级，无房主迁移。
+- 时序一致性：房主单写者 + `eventSequence` 全序 + `expectedEventSequence` 乐观并发 + 幂等键；轮询只增加传播延迟（亚秒级），不引入冲突。
 
 ## 叙事边界
 
