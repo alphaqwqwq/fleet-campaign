@@ -325,6 +325,9 @@ button.link {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  width: 100vw;
+  position: fixed;
+  inset: 0;
   background: #05090d;
   color: #c4dce8;
   font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;

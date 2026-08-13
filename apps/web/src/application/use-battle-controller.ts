@@ -164,7 +164,8 @@ export function useBattleController(initialFleets: () => BattleGroupBuild[] = ba
             runCommand({ type: 'declare-retreat', actorId: 'enemy', battleGroupId: g.id })
           }
         }
-        if (isEngagementOver(s)) {
+        // 用撤退声明后的最新状态判断战果。
+        if (isEngagementOver(stateRef.current)) {
           runCommand({ type: 'resolve-engagement', actorId: 'player' })
           return
         }
@@ -232,9 +233,14 @@ export function useBattleController(initialFleets: () => BattleGroupBuild[] = ba
   const playerReadyCharged = useMemo(() => {
     const player = state.battleGroups.find((g) => g.faction === 'player' && g.status === 'active')
     if (!player || state.phase !== 'ballistics') return []
-    return allShips(player).flatMap((ship) =>
-      ship.weapons.filter((w) => w.charge !== null && w.charge === 0).map((w) => ({ weaponId: w.weaponId, shipId: ship.id })),
-    )
+    const enemy = state.battleGroups.find((g) => g.faction === 'enemy' && g.status === 'active')
+    return allShips(player)
+      .filter((ship) => ship.status === 'active')
+      .flatMap((ship) =>
+        ship.weapons
+          .filter((w) => w.charge !== null && w.charge === 0 && enemy && player.distance <= w.range)
+          .map((w) => ({ weaponId: w.weaponId, shipId: ship.id })),
+      )
   }, [state])
 
   return {

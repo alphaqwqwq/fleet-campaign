@@ -66,8 +66,9 @@ function ShipCard({ ship, self }: { ship: BattleShipState; self: boolean }) {
   )
 }
 
-function FleetPanel({ title, group, self, state }: { title: string; group: BattleGroupState; self: boolean; state: BattleState }) {
-  const archetype = group.status === 'active' ? ` · bot ${ARCHETYPE_LABEL[deriveBotState(state, group.id).archetype]}` : ''
+function FleetPanel({ title, group, self, state, showBot }: { title: string; group: BattleGroupState; self: boolean; state: BattleState; showBot?: boolean }) {
+  const archetype =
+    showBot && group.status === 'active' ? ` · bot ${ARCHETYPE_LABEL[deriveBotState(state, group.id).archetype]}` : ''
   return (
     <div className="b-panel">
       <div className="b-panel-title">
@@ -151,7 +152,6 @@ export function BattleMode({ onExit }: { onExit: () => void }) {
         <FleetPanel title="我方" group={playerGroup} self state={state} />
         <div className="b-stage">
           <BandTrack state={state} />
-
           <div className="b-dock">
             <div className="b-dock-status">
               {completed
@@ -216,7 +216,7 @@ export function BattleMode({ onExit }: { onExit: () => void }) {
             ) : null}
           </div>
         </div>
-        <FleetPanel title="敌方" group={enemyGroup} self={false} state={state} />
+        <FleetPanel title="敌方" group={enemyGroup} self={false} state={state} showBot />
       </div>
 
       <div className="b-log">
