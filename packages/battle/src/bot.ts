@@ -91,6 +91,16 @@ export function deriveBotState(state: BattleState, groupId: string): DerivedBotS
   return { archetype, phase, distance: group.distance, preferred, flagshipHpRatio, enemyFlagshipAlive }
 }
 
+/**
+ * 撤退意图（供后勤阶段的整合流程调用）：临界点后旗舰血量不足且敌方旗舰仍在。
+ * 只在 `phase === 'logistics'` 时合法（引擎 reduceDeclareRetreat 要求）。
+ */
+export function botWantsToRetreat(state: BattleState, groupId: string): boolean {
+  const group = state.battleGroups.find((g) => g.id === groupId)
+  if (!group || group.status !== 'active') return false
+  return deriveBotState(state, groupId).phase === 'retreat-declare'
+}
+
 /** 群内可发射的非充能武器（充能武器走弹着阶段 fire-charged，不在此列）。 */
 export function firableWeapons(group: BattleGroupState): BattleWeaponState[] {
   return allShips(group).flatMap((ship) => ship.weapons.filter((w) => w.charge === null))
@@ -116,7 +126,12 @@ function buildAttacks(
   mode: 'single-main' | 'all-guns',
 ): Extract<BattleCommand, { type: 'maneuver' }>['attacks'] {
   if (!target) return []
-  const weapons = firableWeapons(group).filter((w) => group.distance <= w.range)
+  // 按 weaponId 去重（同目录武器可装在多舰上，但一条命令不能重复同一武器）。
+  const unique = new Map<string, BattleWeaponState>()
+  for (const w of firableWeapons(group)) {
+    if (group.distance <= w.range && !unique.has(w.weaponId)) unique.set(w.weaponId, w)
+  }
+  const weapons = [...unique.values()]
 
   if (mode === 'single-main') {
     const main = weapons.find((w) => w.size === 'main')
@@ -126,8 +141,9 @@ function buildAttacks(
 
   const superheavy = weapons.find((w) => w.size === 'superheavy')
   if (superheavy) return [{ weaponId: superheavy.weaponId, target }]
+  // all-guns-fire 只允许 1 超重 或 至多 2 不同武器；单非超重不合法 → 空（不开火）。
   const two = weapons.slice(0, 2)
-  if (two.length === 0) return []
+  if (two.length < 2) return []
   return two.map((w) => ({ weaponId: w.weaponId, target }))
 }
 
@@ -143,9 +159,10 @@ export function decideBotCommands(state: BattleState, groupId: string): BattleCo
   const base = { actorId: group.controller, battleGroupId: group.id }
   const target = firstTarget(state, group)
 
+  // 撤退不作为行动命令下发（引擎只在后勤阶段接受 declare-retreat）；
+  // 由整合流程用 botWantsToRetreat 在后勤阶段单独处理。
   if (phase === 'retreat-declare') {
-    commands.push({ type: 'declare-retreat', ...base })
-    return commands
+    return []
   }
 
   switch (archetype) {
@@ -178,7 +195,7 @@ export function decideBotCommands(state: BattleState, groupId: string): BattleCo
       if (phase === 'advance') {
         commands.push({ type: 'maneuver', ...base, maneuver: 'full-thrust' })
       } else if (phase === 'hold') {
-        const attacks = buildAttacks(group, target, 'single-main')
+        const attacks = buildAttacks(group, target, 'all-guns')
         commands.push({ type: 'maneuver', ...base, maneuver: 'all-guns-fire', attacks })
       } else {
         commands.push({ type: 'maneuver', ...base, maneuver: 'retro-thrust', retreat: true })

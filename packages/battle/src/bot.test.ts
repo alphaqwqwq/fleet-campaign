@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { buildBattleContent, type BattleGroupBuild } from '@fleet-campaign/content'
 
-import { createSeededRng, decideBotCommands, deriveBotState, dominantArchetype, reduceCommand, RETREAT_HP_RATIO, startEngagement, type BattleState } from './index'
+import { botWantsToRetreat, createSeededRng, decideBotCommands, deriveBotState, dominantArchetype, reduceCommand, RETREAT_HP_RATIO, startEngagement, type BattleState } from './index'
 
 function buildState(groups: BattleGroupBuild[]): BattleState {
   const result = buildBattleContent('bot-test', groups)
@@ -163,8 +163,9 @@ describe('retreat judgment', () => {
     }
     const derived = deriveBotState(hurt, 'player-group')
     expect(derived.phase).toBe('retreat-declare')
-    const commands = decideBotCommands(hurt, 'player-group')
-    expect(commands[0]).toMatchObject({ type: 'declare-retreat' })
+    expect(botWantsToRetreat(hurt, 'player-group')).toBe(true)
+    // 撤退不作为行动命令下发（由后勤阶段的整合流程处理）。
+    expect(decideBotCommands(hurt, 'player-group')).toEqual([])
   })
 
   it('does not retreat before the critical point', () => {
@@ -178,6 +179,7 @@ describe('retreat judgment', () => {
     }
     const derived = deriveBotState(hurt, 'player-group')
     expect(derived.phase).not.toBe('retreat-declare')
+    expect(botWantsToRetreat(hurt, 'player-group')).toBe(false)
   })
 
   it('exposes the configured retreat threshold', () => {
@@ -190,5 +192,39 @@ describe('determinism', () => {
     const state = buildState([battleshipBuild(), carrierBuild()])
     expect(decideBotCommands(state, 'player-group')).toEqual(decideBotCommands(state, 'player-group'))
     expect(deriveBotState(state, 'player-group')).toEqual(deriveBotState(state, 'player-group'))
+  })
+})
+
+describe('command legality', () => {
+  it('emits commands the engine accepts in the action phase', () => {
+    // 推进到行动阶段，跑几个回合，确认 bot 每条命令都被引擎接受。
+    let state = buildState([battleshipBuild(), carrierBuild()])
+    const rng = createSeededRng(125800n)
+    let accepted = 0
+    let rejected = 0
+    for (let i = 0; i < 12; i++) {
+      if (state.phase === 'completed') break
+      if (state.phase === 'logistics' || state.phase === 'ballistics' || state.phase === 'boarding') {
+        const r = reduceCommand(state, { type: 'advance-phase', actorId: 'player' }, rng)
+        if (r.kind === 'accepted') state = r.state
+        continue
+      }
+      const groupId = state.activeGroupId
+      if (!groupId) continue
+      const controller = state.battleGroups.find((g) => g.id === groupId)!.controller
+      for (const cmd of decideBotCommands(state, groupId)) {
+        const r = reduceCommand(state, cmd, rng)
+        if (r.kind === 'accepted') {
+          state = r.state
+          accepted += 1
+        } else {
+          rejected += 1
+        }
+      }
+      const end = reduceCommand(state, { type: 'end-turn', actorId: controller, battleGroupId: groupId })
+      if (end.kind === 'accepted') state = end.state
+    }
+    expect(rejected).toBe(0)
+    expect(accepted).toBeGreaterThan(0)
   })
 })

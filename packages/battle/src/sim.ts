@@ -1,6 +1,6 @@
 import { buildBattleContent, type BattleContent, type BattleGroupBuild } from '@fleet-campaign/content'
 
-import { ARCHETYPE_LABEL, createSeededRng, decideBotCommands, deriveBotState, isEngagementOver, markEliminatedGroups, reduceCommand, startEngagement } from './index'
+import { ARCHETYPE_LABEL, botWantsToRetreat, createSeededRng, decideBotCommands, deriveBotState, isEngagementOver, markEliminatedGroups, reduceCommand, startEngagement } from './index'
 import type { BattleCommand, BattleEvent, BattleGroupState, BattleState } from './types'
 
 /**
@@ -155,6 +155,16 @@ export function runSimulation(content: BattleContent, options: SimOptions): { st
     }
 
     if (state.phase === 'logistics') {
+      // 临界点后 bot 撤退意图：后勤阶段先处理撤退，再推进弹着。
+      for (const group of state.battleGroups.filter((g) => g.status === 'active')) {
+        if (botWantsToRetreat(state, group.id)) {
+          const result = reduceCommand(state, { type: 'declare-retreat', actorId: group.controller, battleGroupId: group.id })
+          if (result.kind === 'accepted') {
+            state = result.state
+            events.push(...result.events)
+          }
+        }
+      }
       const result = reduceCommand(state, { type: 'advance-phase', actorId: 'player' }, rng)
       if (result.kind !== 'accepted') throw new Error(`advance rejected: ${result.rejection.code}`)
       state = result.state
