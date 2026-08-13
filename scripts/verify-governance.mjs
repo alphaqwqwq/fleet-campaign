@@ -14,7 +14,8 @@ const walk = (directory, out) => {
 const all = [];
 walk("docs", all);
 // docs/archive is reference-only; links there are not actively maintained.
-const files = all.filter((file) => !file.startsWith("docs/archive"));
+const portable = (file) => file.replaceAll("\\", "/");
+const files = all.filter((file) => !portable(file).startsWith("docs/archive/"));
 
 const failures = [];
 for (const file of files) {
