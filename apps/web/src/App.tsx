@@ -5,6 +5,7 @@ import { HomeScreen, type HomeAction } from './ui/HomeScreen'
 import { HostRoom } from './ui/HostRoom'
 import { JoinRoom } from './ui/JoinRoom'
 import { DemoMode } from './ui/DemoMode'
+import { BattleMode } from './ui/BattleMode'
 
 export function App() {
   const { t, lang, setLang } = useI18n()
@@ -25,6 +26,8 @@ export function App() {
         <HostRoom onExit={() => setMode(null)} />
       ) : mode === 'join' ? (
         <JoinRoom onExit={() => setMode(null)} />
+      ) : mode === 'battle' ? (
+        <BattleMode onExit={() => setMode(null)} />
       ) : (
         <DemoMode onExit={() => setMode(null)} />
       )}

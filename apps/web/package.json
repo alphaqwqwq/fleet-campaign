@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build"
   },
   "dependencies": {
+    "@fleet-campaign/battle": "0.0.0",
     "@fleet-campaign/content": "0.0.0",
     "@fleet-campaign/domain": "0.0.0",
     "@fleet-campaign/protocol": "0.0.0",
