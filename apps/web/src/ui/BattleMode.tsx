@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 import type { BattleGroupState, BattleShipState, BattleState, BattleWeaponState } from '@fleet-campaign/battle'
 
@@ -35,32 +35,54 @@ function weaponCounters(weapon: BattleWeaponState): string[] {
   return pips
 }
 
+/** 舰种矢量符号（wowsdb 标准矢量，viewBox 27×27，船头朝右）。 */
+function ShipIcon({ type, color }: { type: string; color: string }) {
+  const paths: Record<string, string[]> = {
+    dd: ['m4.5 8.5 19 5-19 5z'],
+    ff: ['M4.5 8.5h10.35l-5.7 10H4.5z', 'm15.75 8.5 1.75.02 6 4.98-6 5h-7.45z'],
+    bb: ['M4.5 8.5h8.35l-5.7 10H4.5z', 'M13.75 8.5h3.1l-5.7 10h-3.1z', 'm17.75 8.5 5.75 5-6 5h-5.45z'],
+    cv: ['M4.5 8.5h10.55v4.55H4.5z', 'M4.5 13.95h10.55v4.55H4.5z', 'm15.95 8.5 7.55 5-7.55 5z'],
+  }
+  const cls =
+    type === 'battleship' ? 'bb' : type === 'carrier' ? 'cv' : type === 'frigate' ? 'ff' : 'dd'
+  return (
+    <svg viewBox="0 0 27 27" fill={color} className="icon" style={{ width: 16, height: 16, verticalAlign: -3, marginRight: 4 }}>
+      {(paths[cls] || paths.dd).map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  )
+}
+
+/** 舰卡（忠实 holo-map：.nm 名称+类型 / 分段 HP / .cnt 计数器 pips）。 */
 function ShipCard({ ship, self, onSelect, selected }: { ship: BattleShipState; self: boolean; onSelect?: () => void; selected?: boolean }) {
-  const color = self ? '#59d8ff' : '#ffb34d'
-  const hpRatio = ship.maxHp > 0 ? ship.hp / ship.maxHp : 0
+  const segments = Math.min(ship.maxHp, 8)
+  const filled = Math.max(0, Math.round((ship.hp / Math.max(1, ship.maxHp)) * segments))
+  const clsLabel = ship.type === 'battleship' ? '战列舰' : ship.type === 'carrier' ? '航母' : ship.type === 'frigate' ? '巡防舰' : ship.type
   return (
     <div className={`b-ship ${ship.status !== 'active' ? 'down' : ''} ${selected ? 'sel' : ''}`} onClick={onSelect}>
-      <div className="b-ship-head">
-        <span className="b-ship-name" style={{ color }}>
-          {ship.id}
+      <div className="nm">
+        <span>
+          <ShipIcon type={ship.type} color={self ? '#59d8ff' : '#ffb34d'} />
+          <span style={{ color: self ? '#59d8ff' : '#ffb34d' }}>{ship.id}</span>
           {ship.flag ? '★' : ''}
         </span>
-        <span className="b-ship-type">{ship.type}</span>
-        <span className="b-ship-hp">
-          {ship.hp}/{ship.maxHp}
-        </span>
+        <span className="cls">{clsLabel}</span>
       </div>
-      <div className="b-hpbar">
-        <i style={{ width: `${hpRatio * 100}%`, background: color }} />
+      <div className="hp">
+        {Array.from({ length: segments }, (_, i) => (
+          <i key={i} className={i < filled ? 'full' : i < filled + 0.5 ? 'dam' : ''} />
+        ))}
       </div>
-      {ship.status !== 'active' ? <div className="b-ship-status">{ship.status}</div> : null}
-      <div className="b-weapons">
+      {ship.status !== 'active' ? <div className="status">{ship.status}</div> : null}
+      <div className="cnt">
         {ship.weapons.map((weapon) => (
-          <div key={weapon.weaponId} className="b-weapon">
-            <span>{weapon.weaponId}</span>
-            <span className="b-weapon-dmg">{weapon.damage}</span>
-            <span className="b-weapon-cnt">{weaponCounters(weapon).join(' · ') || `距离${weapon.range}`}</span>
-          </div>
+          <span
+            key={weapon.weaponId}
+            className={`pip ${weapon.charge !== null ? 'purple' : weapon.flight !== null ? 'cyan' : ''}`}
+          >
+            {weapon.weaponId} {weapon.damage} {weaponCounters(weapon).join('·')}
+          </span>
         ))}
       </div>
     </div>
@@ -75,6 +97,8 @@ function FleetPanel({
   showBot,
   selectedShipId,
   onSelectShip,
+  right,
+  children,
 }: {
   title: string
   group: BattleGroupState
@@ -83,23 +107,57 @@ function FleetPanel({
   showBot?: boolean
   selectedShipId: string | null
   onSelectShip: (shipId: string) => void
+  right?: boolean
+  children?: ReactNode
 }) {
   const archetype =
     showBot && group.status === 'active' ? ` · bot ${ARCHETYPE_LABEL[deriveBotState(state, group.id).archetype]}` : ''
   return (
-    <div className="b-panel">
+    <div className={`b-panel ${right ? 'right' : ''}`}>
       <div className="b-panel-title">
-        {title} · {group.faction}
+        {title} · <b>{group.faction}</b>
         <span className="b-archetype">{archetype}</span>
       </div>
-      <div className="b-fleet-meta">
-        <span className="b-chip">带 {group.distance} {bandName(group.distance)}</span>
-        <span className="b-chip">阻滞 {group.blockDice}d6</span>
-        <span className="b-chip">{group.status}</span>
+      <div className="cnt" style={{ marginTop: 0 }}>
+        <span className="pip cyan">带 {group.distance} {bandName(group.distance)}</span>
+        <span className="pip">阻滞 {group.blockDice}d6</span>
+        <span className={`pip ${group.status === 'active' ? 'cyan' : 'amber'}`}>{group.status}</span>
       </div>
       <ShipCard ship={group.flagship} self={self} selected={selectedShipId === group.flagship.id} onSelect={() => onSelectShip(group.flagship.id)} />
       {group.ships.map((ship) => (
         <ShipCard key={ship.id} ship={ship} self={self} selected={selectedShipId === ship.id} onSelect={() => onSelectShip(ship.id)} />
+      ))}
+      {children}
+    </div>
+  )
+}
+
+/** 时间线：敌方在飞酬载 / 蓄力武器 / 临界点倒计时。 */
+function Timeline({ state }: { state: BattleState }) {
+  const items: { dot: string; n: string; text: string }[] = []
+  for (const group of state.battleGroups.filter((g) => g.faction === 'enemy')) {
+    const ships = [group.flagship, ...group.ships]
+    for (const ship of ships) {
+      for (const weapon of ship.weapons) {
+        if (weapon.flight !== null && weapon.flight > 0) {
+          items.push({ dot: 'cyan', n: '酬载', text: `${ship.id} 还有 ${weapon.flight} 轮命中` })
+        }
+        if (weapon.charge !== null && weapon.charge > 0) {
+          items.push({ dot: 'purple', n: '充能', text: `${ship.id} 蓄力 ${weapon.charge}` })
+        }
+      }
+    }
+  }
+  if (state.round >= 5) items.push({ dot: 'red', n: '时钟', text: `第 ${state.round} 轮 临界点` })
+  return (
+    <div className="b-tl">
+      <div className="b-panel-title" style={{ marginBottom: 4 }}>时间线</div>
+      {items.map((item, i) => (
+        <div key={i} className="item">
+          <span className={`dot ${item.dot}`} />
+          <span className="n">{item.n}</span>
+          {item.text}
+        </div>
       ))}
     </div>
   )
@@ -297,9 +355,12 @@ export function BattleMode({ onExit }: { onExit: () => void }) {
           self={false}
           state={state}
           showBot
+          right
           selectedShipId={selectedShipId}
           onSelectShip={(id) => setSelectedShipId(id)}
-        />
+        >
+          <Timeline state={state} />
+        </FleetPanel>
       </div>
 
       <div className="b-log">

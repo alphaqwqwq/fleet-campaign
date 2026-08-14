@@ -142,7 +142,7 @@ export function HoloMapCanvas(props: HoloMapProps) {
     const BANDS = ['极限', '长', '瞄准镜', '坍缩', '近', '至近']
     const railL = 0.1 * W
     const railR = 0.9 * W
-    const railY = H * 0.16
+    const railY = H * 0.14
     const BX = (b: number) => railL + (5 - b) * ((railR - railL) / 5)
 
     // 舰船图标（wowsdb 标准矢量，viewBox 27×27，船头朝右）
@@ -311,25 +311,82 @@ export function HoloMapCanvas(props: HoloMapProps) {
         return Math.max(0, s.x * c.x + s.y * c.y)
       }
 
-      function drawPlanet(x: number, y: number, r: number, color: string, light: { x: number; y: number }, lit: number) {
+      function drawGiant(x: number, y: number, r: number, light: { x: number; y: number }, lit: number) {
+        if (r < 6) return
+        g.shadowColor = `rgba(110,150,220,${0.12 + 0.3 * lit})`
+        g.shadowBlur = r * 0.4
+        const grad = g.createRadialGradient(x + light.x * r * 0.55, y + light.y * r * 0.55, r * 0.1, x, y, r)
+        grad.addColorStop(0, `rgba(175,220,255,${0.16 + 0.76 * lit})`)
+        grad.addColorStop(0.4, `rgba(60,120,200,${0.07 + 0.55 * lit})`)
+        grad.addColorStop(1, 'rgba(3,9,20,.72)')
+        g.fillStyle = grad
+        g.beginPath()
+        g.arc(x, y, r, 0, 6.28)
+        g.fill()
+        g.shadowBlur = 0
+        const term = g.createRadialGradient(x + light.x * r * 0.75, y + light.y * r * 0.75, 0, x, y, r * 1.2)
+        term.addColorStop(0, 'rgba(255,255,255,0)')
+        term.addColorStop(0.6, 'rgba(255,255,255,0)')
+        term.addColorStop(0.68, 'rgba(4,8,12,.65)')
+        term.addColorStop(1, 'rgba(2,5,9,.92)')
+        g.fillStyle = term
+        g.beginPath()
+        g.arc(x, y, r, 0, 6.28)
+        g.fill()
+      }
+
+      // 岩质行星：暖棕、带陨坑（与冷白的卫星明显区分）
+      function drawRocky(x: number, y: number, r: number, light: { x: number; y: number }, lit: number) {
         if (r < 2) return
         const grad = g.createRadialGradient(x + light.x * r * 0.5, y + light.y * r * 0.5, r * 0.1, x, y, r)
-        grad.addColorStop(0, color)
-        grad.addColorStop(0.55, color)
-        grad.addColorStop(1, 'rgba(6,14,24,.92)')
+        grad.addColorStop(0, `rgba(224,184,142,${0.14 + 0.72 * lit})`)
+        grad.addColorStop(0.6, `rgba(185,138,94,${0.1 + 0.6 * lit})`)
+        grad.addColorStop(1, 'rgba(26,16,8,.8)')
+        g.globalAlpha = 0.85
+        g.fillStyle = grad
+        g.beginPath()
+        g.arc(x, y, r, 0, 6.28)
+        g.fill()
+        g.fillStyle = `rgba(58,36,20,${0.3 + 0.3 * lit})`
+        for (const [dx, dy, rr] of [[-0.32, 0.18, 0.22], [0.34, -0.12, 0.15], [-0.04, -0.36, 0.11]] as const) {
+          g.beginPath()
+          g.arc(x + dx * r, y + dy * r, rr * r, 0, 6.28)
+          g.fill()
+        }
+        const term = g.createRadialGradient(x + light.x * r * 0.75, y + light.y * r * 0.75, 0, x, y, r * 1.2)
+        term.addColorStop(0, 'rgba(255,255,255,0)')
+        term.addColorStop(0.6, 'rgba(255,255,255,0)')
+        term.addColorStop(0.68, 'rgba(4,8,12,.6)')
+        term.addColorStop(1, 'rgba(2,5,9,.9)')
+        g.fillStyle = term
+        g.beginPath()
+        g.arc(x, y, r, 0, 6.28)
+        g.fill()
+        g.globalAlpha = 1
+      }
+
+      // 卫星：冷白平滑、无表面细节
+      function drawSat(x: number, y: number, r: number, light: { x: number; y: number }, lit: number) {
+        if (r < 1.5) return
+        const grad = g.createRadialGradient(x + light.x * r * 0.5, y + light.y * r * 0.5, r * 0.1, x, y, r)
+        grad.addColorStop(0, `rgba(255,255,255,${0.15 + 0.75 * lit})`)
+        grad.addColorStop(0.55, `rgba(220,232,242,${0.1 + 0.6 * lit})`)
+        grad.addColorStop(1, 'rgba(40,52,66,.85)')
+        g.globalAlpha = 0.9
         g.fillStyle = grad
         g.beginPath()
         g.arc(x, y, r, 0, 6.28)
         g.fill()
         const term = g.createRadialGradient(x + light.x * r * 0.75, y + light.y * r * 0.75, 0, x, y, r * 1.2)
         term.addColorStop(0, 'rgba(255,255,255,0)')
-        term.addColorStop(0.6, 'rgba(255,255,255,0)')
-        term.addColorStop(0.68, `rgba(4,8,12,${0.5 + 0.2 * lit})`)
-        term.addColorStop(1, 'rgba(2,5,9,.92)')
+        term.addColorStop(0.65, 'rgba(255,255,255,0)')
+        term.addColorStop(0.72, 'rgba(4,8,12,.55)')
+        term.addColorStop(1, 'rgba(2,5,9,.9)')
         g.fillStyle = term
         g.beginPath()
         g.arc(x, y, r, 0, 6.28)
         g.fill()
+        g.globalAlpha = 1
       }
 
       const list: { along: number; draw: () => void }[] = []
@@ -348,15 +405,15 @@ export function HoloMapCanvas(props: HoloMapProps) {
       if (rp && !occluded(rp)) {
         list.push({
           along: rp.along,
-          draw: () => drawPlanet(rp.x, rp.y, rp.size, 'rgba(224,184,142,.82)', lightFor(spC, rp), litFactor(rpos)),
+          draw: () => drawRocky(rp.x, rp.y, rp.size, lightFor(spC, rp), litFactor(rpos)),
         })
       }
-      if (gp) list.push({ along: gp.along, draw: () => drawPlanet(gp.x, gp.y, gp.size, 'rgba(110,160,220,.85)', lightFor(spC, gp), litFactor(gpos)) })
+      if (gp) list.push({ along: gp.along, draw: () => drawGiant(gp.x, gp.y, gp.size, lightFor(spC, gp), litFactor(gpos)) })
       const mp = project(mpos, MOON.r, cp, vdir)
       if (mp && !occluded(mp)) {
         list.push({
           along: mp.along,
-          draw: () => drawPlanet(mp.x, mp.y, mp.size, 'rgba(220,232,242,.85)', lightFor(spC, mp), litFactor(mpos)),
+          draw: () => drawSat(mp.x, mp.y, mp.size, lightFor(spC, mp), litFactor(mpos)),
         })
       }
       list.sort((a, b) => a.along - b.along)
@@ -410,6 +467,10 @@ export function HoloMapCanvas(props: HoloMapProps) {
         g.font = '10px sans-serif'
         g.textAlign = 'center'
         g.fillText(BANDS[b], x, railY - 12)
+        if (on) {
+          g.fillStyle = 'rgba(89,216,255,.10)'
+          g.fillRect(x - 0.03 * W, railY - 4, 0.06 * W, H * 0.82 - railY + 4)
+        }
       }
 
       const ships = renderShips()
