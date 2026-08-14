@@ -77,7 +77,10 @@ function ShipCard({ ship, self, onSelect, selected }: { ship: BattleShipState; s
       {ship.status !== 'active' ? <div className="status">{ship.status}</div> : null}
       <div className="cnt">
         {ship.weapons.map((weapon) => (
-          <span key={weapon.weaponId} className={`pip ${weapon.charge !== null || weapon.payload ? 'purple' : ''}`}>
+          <span
+            key={weapon.weaponId}
+            className={`pip ${weapon.charge !== null ? 'purple' : weapon.flight !== null ? 'cyan' : ''}`}
+          >
             {weapon.weaponId} {weapon.damage} {weaponCounters(weapon).join('·')}
           </span>
         ))}
@@ -129,10 +132,10 @@ function FleetPanel({
   )
 }
 
-/** 时间线：在飞酬载 / 蓄力武器 / 临界点倒计时。 */
+/** 时间线：敌方在飞酬载 / 蓄力武器 / 临界点倒计时。 */
 function Timeline({ state }: { state: BattleState }) {
   const items: { dot: string; n: string; text: string }[] = []
-  for (const group of state.battleGroups) {
+  for (const group of state.battleGroups.filter((g) => g.faction === 'enemy')) {
     const ships = [group.flagship, ...group.ships]
     for (const ship of ships) {
       for (const weapon of ship.weapons) {

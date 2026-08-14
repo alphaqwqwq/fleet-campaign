@@ -430,6 +430,9 @@ button.link {
 .pip.cyan { color: var(--b-cyan); border-color: var(--b-cyan); }
 .pip.amber { color: var(--b-amber); border-color: var(--b-amber); }
 
+.b-panel .cnt { display: flex; gap: 6px; flex-wrap: wrap; }
+.b-panel .cnt .pip { margin: 0; }
+
 /* 时间线 */
 .b-tl { border-top: 1px solid var(--b-edge); padding-top: 6px; margin-top: auto; }
 .b-tl .item { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 3px 0; color: var(--b-dim); }
