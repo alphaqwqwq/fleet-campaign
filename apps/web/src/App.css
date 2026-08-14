@@ -320,7 +320,27 @@ button.link {
   padding: 1rem;
 }
 
-/* ===== M2-E 交战界面（三栏全息控制台） ===== */
+/* ===== M2-E 交战界面（三栏全息控制台，忠实移植 holo-map.html） ===== */
+:root {
+  --b-deep: #05090d;
+  --b-panel: #0d1a24;
+  --b-panel2: #0f2030;
+  --b-edge: #1b3a4d;
+  --b-cyan: #59d8ff;
+  --b-cyan-dim: #2a6f8f;
+  --b-cyan-glow: rgba(89, 216, 255, 0.45);
+  --b-amber: #ffb34d;
+  --b-red: #ff5a5a;
+  --b-purple: #b78cff;
+  --b-white: #dff4ff;
+  --b-text: #c4dce8;
+  --b-dim: #6f8fa1;
+  --b-mono: "Consolas", "SFMono-Regular", monospace;
+  --b-sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --b-glow: 0 0 8px var(--b-cyan-glow);
+  --b-radius: 6px;
+}
+
 .battle {
   display: flex;
   flex-direction: column;
@@ -328,150 +348,148 @@ button.link {
   width: 100vw;
   position: fixed;
   inset: 0;
-  background: #05090d;
-  color: #c4dce8;
-  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--b-deep);
+  color: var(--b-text);
+  font-family: var(--b-sans);
 }
+
+/* 顶栏 */
 .b-top {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 6px 14px;
-  background: #0d1a24;
-  border-bottom: 1px solid #1b3a4d;
-  flex-wrap: wrap;
+  background: var(--b-panel);
+  border-bottom: 1px solid var(--b-edge);
 }
 .b-brand {
-  color: #59d8ff;
+  color: var(--b-cyan);
   font-weight: 700;
   letter-spacing: 0.14em;
   font-size: 13px;
-  text-shadow: 0 0 8px rgba(89,216,255,.45);
+  text-shadow: var(--b-glow);
+  white-space: nowrap;
 }
-.b-round { font-family: Consolas, monospace; color: #59d8ff; font-size: 13px; }
-.b-phases { display: flex; gap: 4px; margin-left: auto; font-size: 11px; color: #6f8fa1; }
-.b-phase { padding: 2px 10px; border: 1px solid #1b3a4d; border-radius: 3px; }
-.b-phase.on { color: #59d8ff; border-color: #59d8ff; text-shadow: 0 0 8px rgba(89,216,255,.45); }
-.b-seed { font-family: Consolas, monospace; color: #6f8fa1; font-size: 11px; }
+.b-round { font-family: var(--b-mono); color: var(--b-cyan); font-size: 13px; }
+.b-phases { display: flex; gap: 4px; margin-left: auto; font-size: 11px; color: var(--b-dim); }
+.b-phase { padding: 2px 10px; border: 1px solid var(--b-edge); border-radius: 3px; }
+.b-phase.on { color: var(--b-cyan); border-color: var(--b-cyan); text-shadow: var(--b-glow); }
+.b-seed { font-family: var(--b-mono); color: var(--b-dim); font-size: 11px; }
 .b-top-actions { display: flex; gap: 6px; }
 .b-top-actions button { margin: 0; }
 
-.b-body {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-  overflow: hidden;
-}
+.b-body { flex: 1; display: flex; min-height: 0; }
+
+/* 侧栏（只放数据，不放操作） */
 .b-panel {
-  width: 260px;
+  width: 250px;
   flex-shrink: 0;
-  background: #0d1a24;
-  border-right: 1px solid #1b3a4d;
+  background: var(--b-panel);
+  border-right: 1px solid var(--b-edge);
   padding: 10px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.b-panel:last-child { border-right: none; border-left: 1px solid #1b3a4d; }
-.b-panel-title { font-size: 11px; letter-spacing: .18em; color: #6f8fa1; }
-.b-archetype { margin-left: 6px; color: #b78cff; }
-.b-fleet-meta { display: flex; gap: 6px; flex-wrap: wrap; }
-.b-chip { font-family: Consolas, monospace; font-size: 10px; padding: 1px 6px; border-radius: 3px; border: 1px solid #1b3a4d; color: #6f8fa1; }
+.b-panel.right { border-right: none; border-left: 1px solid var(--b-edge); }
+.b-panel-title { font-size: 11px; letter-spacing: 0.18em; color: var(--b-dim); }
+.b-panel-title b { color: var(--b-cyan); }
+.b-archetype { margin-left: 6px; color: var(--b-purple); letter-spacing: 0; }
 
 .b-ship {
-  border: 1px solid #1b3a4d;
-  border-radius: 6px;
-  background: #0f2030;
+  border: 1px solid var(--b-edge);
+  border-radius: var(--b-radius);
+  background: var(--b-panel2);
   padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.b-ship.down { opacity: .5; }
-.b-ship-head { display: flex; justify-content: space-between; font-size: 12px; gap: 6px; }
-.b-ship-name { font-weight: 600; }
-.b-ship-type { color: #6f8fa1; font-size: 10px; }
-.b-ship-hp { font-family: Consolas, monospace; color: #dff4ff; }
-.b-hpbar { height: 4px; background: #16303f; border-radius: 2px; margin: 5px 0; overflow: hidden; }
-.b-hpbar i { display: block; height: 100%; }
-.b-ship-status { font-size: 10px; color: #ff5a5a; }
-.b-weapons { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
-.b-weapon { font-size: 10px; color: #6f8fa1; display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
-.b-weapon-dmg { color: #c4dce8; font-family: Consolas, monospace; }
-.b-weapon-cnt { color: #b78cff; font-family: Consolas, monospace; }
-
-.b-stage { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #04080c; position: relative; }
-.b-holo {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.b-map { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
-.b-band-track {
+.b-ship:hover { border-color: var(--b-cyan-dim); }
+.b-ship.sel { border-color: var(--b-cyan); box-shadow: var(--b-glow); }
+.b-ship.down { opacity: 0.5; }
+.b-ship .nm {
+  color: var(--b-white);
+  font-size: 13px;
   display: flex;
-  gap: 8px;
-  width: 88%;
-  align-items: flex-end;
-}
-.b-band {
-  flex: 1;
-  border: 1px solid #1b3a4d;
-  border-radius: 4px;
-  padding: 10px 4px;
-  text-align: center;
-  font-size: 11px;
-  color: #6f8fa1;
-  position: relative;
-  min-height: 60px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: baseline;
   gap: 6px;
 }
-.b-band.on { border-color: #59d8ff; box-shadow: 0 0 10px rgba(89,216,255,.35); color: #a8e6ff; }
-.b-band-name { font-family: Consolas, monospace; }
-.b-marker { font-size: 16px; line-height: 1; text-shadow: 0 0 8px; }
-.b-marker.self { color: #59d8ff; text-shadow: 0 0 8px rgba(89,216,255,.8); }
-.b-marker.enemy { color: #ffb34d; text-shadow: 0 0 8px rgba(255,179,77,.8); }
-.b-map-hint { font-size: 10px; color: #6f8fa1; margin-top: 8px; }
+.b-ship .nm .icon { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
+.b-ship .cls { color: var(--b-dim); font-size: 10px; }
+.b-ship .hp { display: flex; gap: 3px; margin-top: 5px; }
+.b-ship .hp i { flex: 1; height: 4px; background: #16303f; border-radius: 2px; }
+.b-ship .hp i.full { background: var(--b-cyan); box-shadow: var(--b-glow); }
+.b-ship .hp i.dam { background: var(--b-amber); }
+.b-ship .cnt { display: flex; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--b-dim); flex-wrap: wrap; }
+.b-ship .status { font-size: 10px; color: var(--b-red); margin-top: 4px; }
 
+.pip { font-family: var(--b-mono); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--b-edge); }
+.pip.purple { color: var(--b-purple); border-color: var(--b-purple); }
+.pip.cyan { color: var(--b-cyan); border-color: var(--b-cyan); }
+.pip.amber { color: var(--b-amber); border-color: var(--b-amber); }
+
+/* 时间线 */
+.b-tl { border-top: 1px solid var(--b-edge); padding-top: 6px; margin-top: auto; }
+.b-tl .item { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 3px 0; color: var(--b-dim); }
+.b-tl .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--b-cyan); box-shadow: var(--b-glow); flex-shrink: 0; }
+.b-tl .dot.purple { background: var(--b-purple); box-shadow: 0 0 6px var(--b-purple); }
+.b-tl .dot.red { background: var(--b-red); box-shadow: 0 0 6px var(--b-red); }
+.b-tl .n { font-family: var(--b-mono); color: var(--b-cyan); }
+
+/* 地图 + 指令坞 */
+.b-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #04080c;
+  position: relative;
+}
+.b-holo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* 指令坞：底部中央 */
 .b-dock {
   position: relative;
   z-index: 2;
-  background: linear-gradient(180deg, rgba(13,26,36,.96), rgba(9,17,24,.98));
-  border-top: 1px solid #2a6f8f;
+  background: linear-gradient(180deg, rgba(13, 26, 36, 0.96), rgba(9, 17, 24, 0.98));
+  border-top: 1px solid var(--b-cyan-dim);
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.b-dock-status { font-size: 12px; color: #ffb34d; }
-.b-reject { color: #ff5a5a; }
+.b-dock .sel { font-size: 12px; color: var(--b-white); white-space: nowrap; }
+.b-dock .sel b { color: var(--b-cyan); }
+.b-dock-status { font-size: 11px; color: var(--b-amber); }
+.b-reject { color: var(--b-red); }
 .b-dock-cmds { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.b-cmd-label { font-size: 10px; color: #6f8fa1; letter-spacing: .12em; }
+.b-grp-label { font-size: 10px; color: var(--b-dim); align-self: center; letter-spacing: 0.12em; }
 .b-cmd {
   padding: 6px 10px;
-  border: 1px solid #1b3a4d;
-  border-radius: 6px;
-  background: #0f2030;
-  color: #c4dce8;
+  border: 1px solid var(--b-edge);
+  border-radius: var(--b-radius);
+  background: var(--b-panel2);
+  color: var(--b-text);
   font-size: 12px;
   cursor: pointer;
-  transition: border-color .15s, box-shadow .15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   margin: 0;
 }
-.b-cmd:hover { border-color: #2a6f8f; }
-.b-cmd.on { border-color: #59d8ff; box-shadow: 0 0 8px rgba(89,216,255,.45); color: #59d8ff; }
-.b-cmd.primary { border-color: #59d8ff; color: #59d8ff; }
+.b-cmd:hover { border-color: var(--b-cyan-dim); }
+.b-cmd.on { border-color: var(--b-cyan); box-shadow: var(--b-glow); color: var(--b-cyan); }
+.b-cmd[disabled] { opacity: 0.35; cursor: default; }
+.b-cmd.primary { border-color: var(--b-cyan); color: var(--b-cyan); }
 
+/* 事件 / 检定日志 */
 .b-log {
-  border-top: 1px solid #1b3a4d;
-  background: #0d1a24;
+  border-top: 1px solid var(--b-edge);
+  background: var(--b-panel);
   max-height: 26vh;
   overflow-y: auto;
   padding: 6px 14px;
 }
-.b-log-title { font-size: 11px; letter-spacing: .18em; color: #6f8fa1; }
+.b-log-title { font-size: 11px; letter-spacing: 0.18em; color: var(--b-dim); }
 .b-log-list { list-style: none; margin: 4px 0 0; padding: 0; }
-.b-log-list li { font-family: Consolas, monospace; font-size: 11px; color: #c4dce8; padding: 1px 0; border-bottom: 1px dashed rgba(27,58,77,.4); }
+.b-log-list li { font-family: var(--b-mono); font-size: 11px; color: var(--b-text); padding: 1px 0; border-bottom: 1px dashed rgba(27, 58, 77, 0.4); }
