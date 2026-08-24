@@ -1,8 +1,11 @@
 /**
- * Vercel 轮询中继的核心处理逻辑（ADR-005）。
+ * Vercel 轮询中继的核心处理逻辑（ADR-005 + ADR-007）。
  *
  * 每个房间一个追加式事件日志；房主/客机通过 HTTP 轮询读增量、POST 写记录。
  * 中继只存转发，不解析帧、不裁决规则；帧形状校验在两端适配器内完成。
+ *
+ * ADR-007：房间口令（room secret）——房主 host-open 时签发，随日志存储；该房间
+ * 的所有读写操作都要求携带匹配口令，否则 403。防扫描脚本枚举/读取，不抗定向攻击。
  */
 
 export interface RelayStore {
@@ -59,6 +62,43 @@ export function createMemoryRelayStore(): RelayStore {
   }
 }
 
+/** 从 query 或 body 中解析房间口令（ADR-007）。 */
+function resolveSecret(request: RelayRequest): string | undefined {
+  const q = request.query?.secret
+  if (typeof q === 'string' && q.length > 0) return q
+  const body = isRecord(request.body) ? request.body : {}
+  if (typeof body.secret === 'string' && body.secret.length > 0) return body.secret
+  return undefined
+}
+
+/** 读取房间当前口令（最近一次 host-open 记录里存的 secret）。无 host-open 或已 close 视为无口令。 */
+async function roomSecret(store: RelayStore, roomId: string): Promise<string | null> {
+  const total = await store.len(roomId)
+  const existing = await store.range(roomId, 0, total - 1)
+  let lastOpen = -1
+  let lastClose = -1
+  let secret: string | null = null
+  existing.forEach((record, index) => {
+    if (!isRecord(record)) return
+    if (record.kind === 'host-open') {
+      lastOpen = index
+      secret = typeof record.secret === 'string' ? record.secret : null
+    } else if (record.kind === 'host-close') {
+      lastClose = index
+    }
+  })
+  if (lastClose > lastOpen) return null
+  return secret
+}
+
+/** 校验口令：房间必须已由 host-open 开启（有 secret）且传入口令匹配，否则 403。 */
+async function authorize(request: RelayRequest, store: RelayStore, roomId: string): Promise<{ status: number; body: unknown } | null> {
+  const secret = await roomSecret(store, roomId)
+  if (secret === null) return { status: 404, body: { error: 'room_not_found' } }
+  if (resolveSecret(request) !== secret) return { status: 403, body: { error: 'unauthorized' } }
+  return null
+}
+
 export async function handleRelayRequest(request: RelayRequest, store: RelayStore): Promise<RelayResponse> {
   const { roomId, op, query } = request
   if (!roomId) return { status: 400, body: { error: 'room required' } }
@@ -78,34 +118,55 @@ export async function handleRelayRequest(request: RelayRequest, store: RelayStor
             else if (record.kind === 'host-close') lastClose = index
           }
         })
-        if (lastOpen > lastClose) return { status: 409, body: { error: 'room_occupied' } }
+        const secret = resolveSecret(request)
+        if (lastOpen > lastClose) {
+          // 房间已占用：仅当携带当前口令时才允许接管（房主重连/换码复用）。
+          const auth = await authorize(request, store, roomId)
+          if (auth) return auth
+          await store.clear(roomId)
+          await store.append(roomId, { kind: 'host-open', secret: secret ?? null })
+          return { status: 200, body: { ok: true } }
+        }
+        // 新开房间：必须有口令。
+        if (!secret) return { status: 400, body: { error: 'secret required' } }
         // 复用房间码：清空旧日志，避免新房间继承上一场残留帧。
         await store.clear(roomId)
-        await store.append(roomId, { kind: 'host-open' })
+        await store.append(roomId, { kind: 'host-open', secret })
         return { status: 200, body: { ok: true } }
       }
       case 'host-send': {
+        const auth = await authorize(request, store, roomId)
+        if (auth) return auth
         const frame = body.frame
         if (!isRecord(frame)) return { status: 400, body: { error: 'frame required' } }
         await store.append(roomId, { kind: 'to-guest', to: typeof body.to === 'string' ? body.to : null, frame })
         return { status: 200, body: { ok: true } }
       }
-      case 'host-close':
+      case 'host-close': {
+        const auth = await authorize(request, store, roomId)
+        if (auth) return auth
         await store.append(roomId, { kind: 'host-close' })
         return { status: 200, body: { ok: true } }
+      }
       case 'host-close-client': {
+        const auth = await authorize(request, store, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         if (typeof connectionId !== 'string') return { status: 400, body: { error: 'connectionId required' } }
         await store.append(roomId, { kind: 'guest-leave', connectionId })
         return { status: 200, body: { ok: true } }
       }
       case 'guest-join': {
+        const auth = await authorize(request, store, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         if (typeof connectionId !== 'string') return { status: 400, body: { error: 'connectionId required' } }
         await store.append(roomId, { kind: 'guest-join', connectionId })
         return { status: 200, body: { ok: true } }
       }
       case 'guest-send': {
+        const auth = await authorize(request, store, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         const frame = body.frame
         if (typeof connectionId !== 'string' || !isRecord(frame)) {
@@ -115,6 +176,8 @@ export async function handleRelayRequest(request: RelayRequest, store: RelayStor
         return { status: 200, body: { ok: true } }
       }
       case 'guest-leave': {
+        const auth = await authorize(request, store, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         if (typeof connectionId !== 'string') return { status: 400, body: { error: 'connectionId required' } }
         await store.append(roomId, { kind: 'guest-leave', connectionId })
@@ -128,6 +191,8 @@ export async function handleRelayRequest(request: RelayRequest, store: RelayStor
   if (request.method === 'GET') {
     const since = Number(query.since ?? 0)
     if (op === 'host-poll') {
+      const auth = await authorize(request, store, roomId)
+      if (auth) return auth
       const total = await store.len(roomId)
       const from = Math.min(Math.max(since, 0), total)
       const to = Math.min(from + MAX_POLL_RECORDS - 1, total - 1)
@@ -135,6 +200,8 @@ export async function handleRelayRequest(request: RelayRequest, store: RelayStor
       return { status: 200, body: { records, cursor: from + records.length } }
     }
     if (op === 'guest-poll') {
+      const auth = await authorize(request, store, roomId)
+      if (auth) return auth
       const connectionId = query.connectionId ?? ''
       const total = await store.len(roomId)
       const from = Math.min(Math.max(since, 0), total)

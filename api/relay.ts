@@ -80,6 +80,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** 从 query 或 body 中解析房间口令（ADR-007）。 */
+function resolveSecret(request: RelayRequest): string | undefined {
+  const q = request.query?.secret
+  if (typeof q === 'string' && q.length > 0) return q
+  const body = isRecord(request.body) ? request.body : {}
+  if (typeof body.secret === 'string' && body.secret.length > 0) return body.secret
+  return undefined
+}
+
+/** 读取房间当前口令（最近一次 host-open 记录里存的 secret）。无 host-open 或已 close 视为无口令。 */
+async function roomSecret(relayStore: RelayStore, roomId: string): Promise<string | null> {
+  const total = await relayStore.len(roomId)
+  const existing = await relayStore.range(roomId, 0, total - 1)
+  let lastOpen = -1
+  let lastClose = -1
+  let secret: string | null = null
+  existing.forEach((record, index) => {
+    if (!isRecord(record)) return
+    if (record.kind === 'host-open') {
+      lastOpen = index
+      secret = typeof record.secret === 'string' ? record.secret : null
+    } else if (record.kind === 'host-close') {
+      lastClose = index
+    }
+  })
+  if (lastClose > lastOpen) return null
+  return secret
+}
+
+/** 校验口令：房间必须已由 host-open 开启（有 secret）且传入口令匹配，否则返回拒绝响应。 */
+async function authorize(request: RelayRequest, relayStore: RelayStore, roomId: string): Promise<{ status: number; body: unknown } | null> {
+  const secret = await roomSecret(relayStore, roomId)
+  if (secret === null) return { status: 404, body: { error: 'room_not_found' } }
+  if (resolveSecret(request) !== secret) return { status: 403, body: { error: 'unauthorized' } }
+  return null
+}
+
 async function handleRelayRequest(request: RelayRequest, relayStore: RelayStore): Promise<{ status: number; body: unknown }> {
   const { roomId, op, query } = request
   if (!roomId) return { status: 400, body: { error: 'room required' } }
@@ -98,33 +135,54 @@ async function handleRelayRequest(request: RelayRequest, relayStore: RelayStore)
             else if (record.kind === 'host-close') lastClose = index
           }
         })
-        if (lastOpen > lastClose) return { status: 409, body: { error: 'room_occupied' } }
+        const secret = resolveSecret(request)
+        if (lastOpen > lastClose) {
+          // 房间已占用：仅当携带当前口令时才允许接管（房主重连/换码复用）。
+          const auth = await authorize(request, relayStore, roomId)
+          if (auth) return auth
+          await relayStore.clear(roomId)
+          await relayStore.append(roomId, { kind: 'host-open', secret: secret ?? null })
+          return { status: 200, body: { ok: true } }
+        }
+        // 新开房间：必须有口令。
+        if (!secret) return { status: 400, body: { error: 'secret required' } }
         await relayStore.clear(roomId)
-        await relayStore.append(roomId, { kind: 'host-open' })
+        await relayStore.append(roomId, { kind: 'host-open', secret })
         return { status: 200, body: { ok: true } }
       }
       case 'host-send': {
+        const auth = await authorize(request, relayStore, roomId)
+        if (auth) return auth
         const frame = body.frame
         if (!isRecord(frame)) return { status: 400, body: { error: 'frame required' } }
         await relayStore.append(roomId, { kind: 'to-guest', to: typeof body.to === 'string' ? body.to : null, frame })
         return { status: 200, body: { ok: true } }
       }
-      case 'host-close':
+      case 'host-close': {
+        const auth = await authorize(request, relayStore, roomId)
+        if (auth) return auth
         await relayStore.append(roomId, { kind: 'host-close' })
         return { status: 200, body: { ok: true } }
+      }
       case 'host-close-client': {
+        const auth = await authorize(request, relayStore, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         if (typeof connectionId !== 'string') return { status: 400, body: { error: 'connectionId required' } }
         await relayStore.append(roomId, { kind: 'guest-leave', connectionId })
         return { status: 200, body: { ok: true } }
       }
       case 'guest-join': {
+        const auth = await authorize(request, relayStore, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         if (typeof connectionId !== 'string') return { status: 400, body: { error: 'connectionId required' } }
         await relayStore.append(roomId, { kind: 'guest-join', connectionId })
         return { status: 200, body: { ok: true } }
       }
       case 'guest-send': {
+        const auth = await authorize(request, relayStore, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         const frame = body.frame
         if (typeof connectionId !== 'string' || !isRecord(frame)) {
@@ -134,6 +192,8 @@ async function handleRelayRequest(request: RelayRequest, relayStore: RelayStore)
         return { status: 200, body: { ok: true } }
       }
       case 'guest-leave': {
+        const auth = await authorize(request, relayStore, roomId)
+        if (auth) return auth
         const connectionId = body.connectionId
         if (typeof connectionId !== 'string') return { status: 400, body: { error: 'connectionId required' } }
         await relayStore.append(roomId, { kind: 'guest-leave', connectionId })
@@ -147,6 +207,8 @@ async function handleRelayRequest(request: RelayRequest, relayStore: RelayStore)
   if (request.method === 'GET') {
     const since = Number(query.since ?? 0)
     if (op === 'host-poll') {
+      const auth = await authorize(request, relayStore, roomId)
+      if (auth) return auth
       const total = await relayStore.len(roomId)
       const from = Math.min(Math.max(since, 0), total)
       const to = Math.min(from + MAX_POLL_RECORDS - 1, total - 1)
@@ -154,6 +216,8 @@ async function handleRelayRequest(request: RelayRequest, relayStore: RelayStore)
       return { status: 200, body: { records, cursor: from + records.length } }
     }
     if (op === 'guest-poll') {
+      const auth = await authorize(request, relayStore, roomId)
+      if (auth) return auth
       const connectionId = query.connectionId ?? ''
       const total = await relayStore.len(roomId)
       const from = Math.min(Math.max(since, 0), total)

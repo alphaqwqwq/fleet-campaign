@@ -41,7 +41,8 @@ export function createHostPeerJsTransport(initialEvents: HostTransportEvents): H
     setEvents(next: HostTransportEvents): void {
       events = next
     },
-    open(roomId: string): void {
+    open(roomId: string, secret?: string): void {
+      void secret
       if (status !== 'starting' || peer) return
       const id = peerIdForRoom(roomId)
       const p = new Peer(id, { debug: 0 })
@@ -133,7 +134,8 @@ export function createClientPeerJsTransport(initialEvents: ClientTransportEvents
     setEvents(next: ClientTransportEvents): void {
       events = next
     },
-    connect(roomId: string): void {
+    connect(roomId: string, secret?: string): void {
+      void secret
       conn?.close()
       peer?.destroy()
       conn = null

@@ -25,6 +25,13 @@ export function JoinRoom({ onExit }: { onExit: () => void }) {
   const sessionRef = useRef<ReturnType<typeof createClientSession> | null>(null)
   const lastEventSequence = useRef(-1)
 
+  // ADR-007：分享码 = 5 位房间码 + '-' + 房间口令，解析出用于存储/重连的 roomId。
+  function parsedRoomId(): string {
+    const code = roomCode.trim()
+    const match = /^(\d{5})-(.+)$/.exec(code)
+    return match ? match[1] : code
+  }
+
   useEffect(() => {
     return () => {
       sessionRef.current?.close()
@@ -36,7 +43,7 @@ export function JoinRoom({ onExit }: { onExit: () => void }) {
     if (!joined) return
     const current = sessionRef.current?.view
     if (!current || current.status !== 'closed') return
-    clearResumeToken(roomCode.trim())
+    clearResumeToken(parsedRoomId())
     sessionRef.current?.close()
     sessionRef.current = null
     setJoined(false)
@@ -46,11 +53,16 @@ export function JoinRoom({ onExit }: { onExit: () => void }) {
   function join(): void {
     const code = roomCode.trim()
     if (!code) return
+    // ADR-007：分享码 = 5 位房间码 + '-' + 房间口令（口令可能是 base64url，含 '-'，故用房间码锚定分割）。
+    const match = /^(\d{5})-(.+)$/.exec(code)
+    const roomId = match ? match[1] : code
+    const secret = match ? match[2] : undefined
     const session = createClientSession({
       clientTransport: createClientTransport(),
       clientId: getOrCreateClientId(),
-      resumeToken: readResumeToken(code),
-      onToken: (token) => writeResumeToken(code, token),
+      resumeToken: readResumeToken(roomId),
+      secret,
+      onToken: (token) => writeResumeToken(roomId, token),
     })
     session.subscribe(() => {
       const broadcast = session.view.lastBroadcast
@@ -61,13 +73,13 @@ export function JoinRoom({ onExit }: { onExit: () => void }) {
       setTick((next) => next + 1)
     })
     sessionRef.current = session
-    session.connect(code, role)
+    session.connect(roomId, role)
     setJoined(true)
   }
 
   function leave(): void {
     void sessionRef.current?.close()
-    clearResumeToken(roomCode.trim())
+    clearResumeToken(parsedRoomId())
     onExit()
   }
 

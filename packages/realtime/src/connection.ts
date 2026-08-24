@@ -35,7 +35,7 @@ export interface ClientTransportEvents {
 export interface HostTransport {
   readonly status: HostStatus
   setEvents(events: HostTransportEvents): void
-  open(roomId: string): void
+  open(roomId: string, secret?: string): void
   sendTo(connectionId: string, frame: HostToClientFrame): boolean
   broadcast(frame: HostToClientFrame): void
   closeClient(connectionId: string): void
@@ -46,7 +46,7 @@ export interface HostTransport {
 export interface ClientTransport {
   readonly status: ClientStatus
   setEvents(events: ClientTransportEvents): void
-  connect(roomId: string): void
+  connect(roomId: string, secret?: string): void
   send(frame: ClientToHostFrame): boolean
   close(): void
 }

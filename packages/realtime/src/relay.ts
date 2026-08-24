@@ -120,6 +120,7 @@ export function createRelayHostTransport(
   let events = initialEvents
   let status: HostStatus = 'starting'
   let roomId = ''
+  let secret = ''
   let cursor = 0
   let stopPolling: (() => void) | null = null
 
@@ -129,7 +130,9 @@ export function createRelayHostTransport(
     params: Record<string, string | number | undefined> = {},
     body?: unknown,
   ): Promise<RelayJson> {
-    return relayRequest(fetchFn, buildUrl(options.baseUrl, roomId, op, params), method, body)
+    // ADR-007：房间口令随 query 传递，授权在服务端校验。
+    const withSecret = secret ? { ...params, secret } : params
+    return relayRequest(fetchFn, buildUrl(options.baseUrl, roomId, op, withSecret), method, body)
   }
 
   function handleRecord(record: unknown): void {
@@ -151,9 +154,10 @@ export function createRelayHostTransport(
     setEvents(next: HostTransportEvents): void {
       events = next
     },
-    open(nextRoomId: string): void {
+    open(nextRoomId: string, nextSecret?: string): void {
       if (status !== 'starting') return
       roomId = nextRoomId
+      secret = nextSecret ?? ''
       void request('POST', 'host-open')
         .then(() => {
           if (status !== 'starting') return
@@ -211,6 +215,7 @@ export function createRelayClientTransport(
   let status: ClientStatus = 'idle'
   let roomId = ''
   let connectionId = ''
+  let secret = ''
   let cursor = 0
   let stopPolling: (() => void) | null = null
 
@@ -225,7 +230,9 @@ export function createRelayClientTransport(
     params: Record<string, string | number | undefined> = {},
     body?: unknown,
   ): Promise<RelayJson> {
-    return relayRequest(fetchFn, buildUrl(options.baseUrl, roomId, op, params), method, body)
+    // ADR-007：房间口令随 query 传递，授权在服务端校验。
+    const withSecret = secret ? { ...params, secret } : params
+    return relayRequest(fetchFn, buildUrl(options.baseUrl, roomId, op, withSecret), method, body)
   }
 
   return {
@@ -235,9 +242,10 @@ export function createRelayClientTransport(
     setEvents(next: ClientTransportEvents): void {
       events = next
     },
-    connect(nextRoomId: string): void {
+    connect(nextRoomId: string, nextSecret?: string): void {
       if (status !== 'idle' && status !== 'transport_unavailable') return
       roomId = nextRoomId
+      secret = nextSecret ?? ''
       connectionId = `cn_${randomUrlSafe(8)}`
       cursor = 0
       setStatus('connecting')

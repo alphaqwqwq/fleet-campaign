@@ -67,6 +67,7 @@ function waitFor(predicate: () => boolean, message = 'timeout'): Promise<void> {
 }
 
 const ROOM = '12345'
+const SECRET = 'testsecret'
 const CLIENT_ID = 'u_00000000-0000-4000-8000-000000000001'
 
 function joinFrame(): ClientToHostFrame {
@@ -86,7 +87,7 @@ describe('relay polling transport', () => {
       { ...noopHostEvents, onFrame: (connectionId, frame) => receivedByHost.push({ connectionId, frame }) },
       transportOptions(fetchFn),
     )
-    host.open(ROOM)
+    host.open(ROOM, SECRET)
 
     const receivedByClient: HostToClientFrame[] = []
     const client: ClientTransport = createRelayClientTransport(
@@ -95,7 +96,7 @@ describe('relay polling transport', () => {
     )
 
     await waitFor(() => host.status === 'open', 'host open')
-    client.connect(ROOM)
+    client.connect(ROOM, SECRET)
     await waitFor(() => client.status === 'connected', 'client connected')
 
     expect(client.send(joinFrame())).toBe(true)
@@ -114,7 +115,7 @@ describe('relay polling transport', () => {
     const store = createMemoryRelayStore()
     const fetchFn = createRelayFetch(store)
     const host: HostTransport = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
-    host.open(ROOM)
+    host.open(ROOM, SECRET)
 
     const receivedA: HostToClientFrame[] = []
     const receivedB: HostToClientFrame[] = []
@@ -122,8 +123,8 @@ describe('relay polling transport', () => {
     const clientB = createRelayClientTransport({ ...noopClientEvents, onFrame: (frame) => receivedB.push(frame) }, transportOptions(fetchFn))
 
     await waitFor(() => host.status === 'open', 'host open')
-    clientA.connect(ROOM)
-    clientB.connect(ROOM)
+    clientA.connect(ROOM, SECRET)
+    clientB.connect(ROOM, SECRET)
     await waitFor(() => clientA.status === 'connected' && clientB.status === 'connected', 'clients connected')
 
     const frame: HostToClientFrame = { frame: 'room-closed', protocolVersion: 1, messageId: 'm-close', roomId: ROOM }
@@ -141,7 +142,7 @@ describe('relay polling transport', () => {
     const store = createMemoryRelayStore()
     const fetchFn = createRelayFetch(store)
     const host: HostTransport = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
-    host.open(ROOM)
+    host.open(ROOM, SECRET)
     await waitFor(() => host.status === 'open', 'host open')
 
     const invalid = { frame: 'not-a-frame', protocolVersion: 1 } as unknown as HostToClientFrame
@@ -149,22 +150,37 @@ describe('relay polling transport', () => {
     host.close()
   })
 
-  it('rejects a second host on an occupied room and frees the code on close', async () => {
+  it('rejects a second host with the wrong secret and frees the code on close', async () => {
     const store = createMemoryRelayStore()
     const fetchFn = createRelayFetch(store)
     const host = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
-    host.open(ROOM)
+    host.open(ROOM, SECRET)
     await waitFor(() => host.status === 'open', 'first host open')
 
+    // ADR-007：房间已占用时，携带错误口令的第二个房主被拒（403 → transport_unavailable）。
     const host2 = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
-    host2.open(ROOM)
-    await waitFor(() => host2.status === 'transport_unavailable', 'second host rejected as occupied')
+    host2.open(ROOM, 'wrong-secret')
+    await waitFor(() => host2.status === 'transport_unavailable', 'second host rejected (wrong secret)')
 
     host.close()
     const host3 = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
-    host3.open(ROOM)
+    host3.open(ROOM, SECRET)
     await waitFor(() => host3.status === 'open', 'code freed and reopened')
     host3.close()
+  })
+
+  it('lets a host reclaim an occupied room with the correct secret (reconnect/reuse)', async () => {
+    const store = createMemoryRelayStore()
+    const fetchFn = createRelayFetch(store)
+    const host = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
+    host.open(ROOM, SECRET)
+    await waitFor(() => host.status === 'open', 'first host open')
+
+    // ADR-007：携带正确口令的房主可接管已占用房间（房主重连/换码复用）。
+    const host2 = createRelayHostTransport(noopHostEvents, transportOptions(fetchFn))
+    host2.open(ROOM, SECRET)
+    await waitFor(() => host2.status === 'open', 'second host reclaimed with correct secret')
+    host2.close()
   })
 
   it('delivers each frame exactly once even under slow (overlapping) polls', async () => {
@@ -178,13 +194,13 @@ describe('relay polling transport', () => {
     const opts = { baseUrl: 'http://relay.test/api/relay', fetchFn: slowFetch, pollIntervalMs: 5 }
     const received: HostToClientFrame[] = []
     const host: HostTransport = createRelayHostTransport(noopHostEvents, opts)
-    host.open(ROOM)
+    host.open(ROOM, SECRET)
     const client: ClientTransport = createRelayClientTransport(
       { ...noopClientEvents, onFrame: (frame) => received.push(frame) },
       opts,
     )
     await waitFor(() => host.status === 'open', 'host open')
-    client.connect(ROOM)
+    client.connect(ROOM, SECRET)
     await waitFor(() => client.status === 'connected', 'client connected')
 
     const frame: HostToClientFrame = { frame: 'room-closed', protocolVersion: 1, messageId: 'm-close', roomId: ROOM }
@@ -195,5 +211,67 @@ describe('relay polling transport', () => {
     expect(deliveries.length).toBe(1)
     host.close()
     client.close()
+  })
+})
+
+// ADR-007：房间口令鉴权。中继对每个房间的读写都要求携带房主签发的口令。
+describe('relay room secret authorization (ADR-007)', () => {
+  it('rejects host-open without a secret', async () => {
+    const store = createMemoryRelayStore()
+    const result = await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-open', query: {}, body: {} }, store)
+    expect(result.status).toBe(400)
+    expect(result.body).toEqual({ error: 'secret required' })
+  })
+
+  it('opens a room with a secret and rejects reads without it', async () => {
+    const store = createMemoryRelayStore()
+    const open = await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-open', query: {}, body: { secret: SECRET } }, store)
+    expect(open.status).toBe(200)
+
+    const pollNoSecret = await handleRelayRequest({ method: 'GET', roomId: ROOM, op: 'host-poll', query: { since: '0' }, body: null }, store)
+    expect(pollNoSecret.status).toBe(403)
+    expect(pollNoSecret.body).toEqual({ error: 'unauthorized' })
+  })
+
+  it('rejects reads with the wrong secret', async () => {
+    const store = createMemoryRelayStore()
+    await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-open', query: {}, body: { secret: SECRET } }, store)
+    const pollWrong = await handleRelayRequest({ method: 'GET', roomId: ROOM, op: 'host-poll', query: { since: '0', secret: 'wrong' }, body: null }, store)
+    expect(pollWrong.status).toBe(403)
+    expect(pollWrong.body).toEqual({ error: 'unauthorized' })
+  })
+
+  it('allows reads and writes with the correct secret', async () => {
+    const store = createMemoryRelayStore()
+    await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-open', query: {}, body: { secret: SECRET } }, store)
+    const poll = await handleRelayRequest({ method: 'GET', roomId: ROOM, op: 'host-poll', query: { since: '0', secret: SECRET }, body: null }, store)
+    expect(poll.status).toBe(200)
+    const send = await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-send', query: { secret: SECRET }, body: { to: null, frame: { frame: 'room-closed', protocolVersion: 1, messageId: 'm', roomId: ROOM } } }, store)
+    expect(send.status).toBe(200)
+  })
+
+  it('returns room_not_found for a room that was never opened', async () => {
+    const store = createMemoryRelayStore()
+    const poll = await handleRelayRequest({ method: 'GET', roomId: '99999', op: 'host-poll', query: { since: '0', secret: SECRET }, body: null }, store)
+    expect(poll.status).toBe(404)
+    expect(poll.body).toEqual({ error: 'room_not_found' })
+  })
+
+  it('rejects guest operations without the secret', async () => {
+    const store = createMemoryRelayStore()
+    await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-open', query: {}, body: { secret: SECRET } }, store)
+    const joinNoSecret = await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'guest-join', query: {}, body: { connectionId: 'cn_1' } }, store)
+    expect(joinNoSecret.status).toBe(403)
+    const joinWithSecret = await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'guest-join', query: { secret: SECRET }, body: { connectionId: 'cn_1' } }, store)
+    expect(joinWithSecret.status).toBe(200)
+  })
+
+  it('frees the room after host-close and rejects further access as room_not_found', async () => {
+    const store = createMemoryRelayStore()
+    await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-open', query: {}, body: { secret: SECRET } }, store)
+    await handleRelayRequest({ method: 'POST', roomId: ROOM, op: 'host-close', query: { secret: SECRET }, body: {} }, store)
+    const poll = await handleRelayRequest({ method: 'GET', roomId: ROOM, op: 'host-poll', query: { since: '0', secret: SECRET }, body: null }, store)
+    expect(poll.status).toBe(404)
+    expect(poll.body).toEqual({ error: 'room_not_found' })
   })
 })

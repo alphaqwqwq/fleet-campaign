@@ -28,6 +28,7 @@ export function HostRoom({ onExit }: { onExit: () => void }) {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [roomId, setRoomId] = useState('')
+  const [roomSecret, setRoomSecret] = useState('')
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export function HostRoom({ onExit }: { onExit: () => void }) {
     })
     const created = host.createRoom()
     setRoomId(created.roomId)
+    setRoomSecret(created.secret)
     void refreshSaves()
     return () => {
       unsubscribe()
@@ -130,12 +132,13 @@ export function HostRoom({ onExit }: { onExit: () => void }) {
   }
 
   async function copyRoomCode(): Promise<void> {
-    await navigator.clipboard?.writeText(roomId)
+    await navigator.clipboard?.writeText(shareCode)
     setCopied(true)
   }
 
   const view = host.getView()
   const snapshot = view.snapshot
+  const shareCode = roomSecret ? `${roomId}-${roomSecret}` : roomId
 
   return (
     <section className="room">
@@ -143,7 +146,7 @@ export function HostRoom({ onExit }: { onExit: () => void }) {
         <div>
           <h2>{t('home.createRoom')}</h2>
           <p className="muted">
-            {t('host.roomCode')}: <code className="room-code">{roomId || '…'}</code>
+            {t('host.roomCode')}: <code className="room-code">{shareCode || '…'}</code>
             <button className="link" onClick={() => void copyRoomCode()} disabled={!roomId}>
               {copied ? '✓' : t('host.roomCodeHint')}
             </button>
