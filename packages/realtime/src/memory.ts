@@ -24,7 +24,8 @@ export class MemoryHostTransport implements HostTransport {
     this.events = events
   }
 
-  open(roomId: string): void {
+  open(roomId: string, secret?: string): void {
+    void secret
     this.room = roomId
     this.status = 'open'
     this.events?.onOpen()
@@ -101,8 +102,9 @@ export class MemoryClientTransport implements ClientTransport {
     if (this.status === 'connected') this.events?.onStatus(this.status)
   }
 
-  connect(roomId: string): void {
+  connect(roomId: string, secret?: string): void {
     void roomId
+    void secret
     this.status = 'connecting'
     this.events?.onStatus('connecting')
     const host = this.host

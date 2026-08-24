@@ -32,6 +32,7 @@
 | 标识 | 格式 | 作用域 | 是否入存档 |
 | --- | --- | --- | --- |
 | `roomId` | 5 位数字（10000–99999，`\d{5}`） | 临时房间，仅房主内存与消息；中继按 roomId 建房间日志，房主关闭或 1h TTL 后释放，复用码会先清空旧日志 | 否 |
+| 房间口令 | 8 字符 base64url（约 48-bit） | 房主 `host-open` 时签发，随日志存储；该房间所有 relay 读写都要求匹配，否则 403。分享码 = `roomId + '-' + secret`，客机输入解析。防扫描脚本枚举，不抗定向攻击（见 [ADR-007](../decisions/ADR-007-RELAY-ROOM-SECRET.md)） | 否（绝不入 URL 之外的持久载体；与 resumeToken 同存 sessionStorage） |
 | `campaignId` | `c_` + UUIDv4 | 长期战役资产 | 是 |
 | `clientId` | `u_` + UUIDv4 | 浏览器本地设备标识 | 否 |
 | 会话令牌 | `t_` + 256-bit | 房主为「房间+clientId+角色」签发，仅会话存储 | 否（绝不入 URL/快照/日志） |
@@ -46,6 +47,7 @@
 
 - 传输抽象 `HostTransport` / `ClientTransport` + 帧校验；默认 **Vercel 轮询中继**（ADR-005：同源 `/api/relay` 函数 + KV，HTTP 轮询，无 WebSocket/NAT/外部信令依赖），`MemoryHostTransport` 为无网络测试替身，PeerJS 适配为 `?transport=peerjs` 备选。
 - 中继只存转发帧、不解析不裁决（房主仍是唯一权威）；每房间追加式日志 + 游标轮询，默认 500ms。
+- **ADR-007 房间口令**：房主 `host-open` 时签发 48-bit 房间口令，随日志存储；该房间的所有 relay 读写（poll/send/join/leave/close）都要求携带匹配口令，否则 403 `unauthorized`；未开启的房间返回 404 `room_not_found`（不再返回 200 空数组，消除枚举 oracle）。口令随 query 传递，与 ADR-005 明文中继一致；防扫描脚本枚举，不抗定向攻击。
 - 建连：房主建端点 → 加入者请求 `player | spectator` → 房主签发令牌绑定角色 → 下发完整快照 → 后续只走 `command-intent` / `command-result`。
 - 重连 / 返回 = 同一 `clientId` 重新加入（可无令牌）：房主角色锁定、重绑连接并**换发新令牌**；只有房主无该 clientId 绑定（房主重启 / 新房间）时才视为令牌失效 → 按新加入处理。房主关闭视为会话结束。
 - 重复连接：以最后通过令牌校验的连接为有效，旧连接收到 `duplicate_connection`。

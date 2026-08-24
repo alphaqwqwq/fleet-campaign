@@ -45,6 +45,8 @@ export interface ClientSessionOptions {
   clientId: string
   createMessageId?: () => string
   resumeToken?: string
+  /** ADR-007：房间口令（来自分享码）。与 resumeToken 一起用于 transport 鉴权。 */
+  secret?: string
   onToken?: (token: string) => void
   leaveTimeoutMs?: number
 }
@@ -85,7 +87,7 @@ export class ClientSessionController {
     this.requestedRole = role
     this.view.status = 'connecting'
     this.view.lastError = null
-    this.options.clientTransport.connect(roomId)
+    this.options.clientTransport.connect(roomId, this.options.secret)
     this.changed()
   }
 
@@ -97,7 +99,7 @@ export class ClientSessionController {
       return
     }
     this.view.status = 'reconnecting'
-    this.options.clientTransport.connect(this.roomId)
+    this.options.clientTransport.connect(this.roomId, this.options.secret)
     this.changed()
   }
 

@@ -14,6 +14,7 @@ export interface HostSessionOptions { hostTransport: HostTransport; hostClientId
 export interface HostSessionView {
   status: HostSessionStatus
   roomId: string
+  secret: string
   campaignId: string
   seed: string
   hasPlayer: boolean
@@ -21,11 +22,11 @@ export interface HostSessionView {
   lastEvent: BroadcastEvent | null
   roster: Snapshot['roster']
 }
-
 /** Application composition for host authority. Transport frames are validated before reducer access. */
 export class HostSessionController {
   public status: HostSessionStatus = 'starting'
   private roomId = ''
+  private roomSecret = ''
   private campaignId = ''
   private seed = ''
   private game: GameState | null = null
@@ -51,10 +52,11 @@ export class HostSessionController {
     })
   }
 
-  public createRoom(): { roomId: string; campaignId: string } {
+  public createRoom(): { roomId: string; campaignId: string; secret: string } {
     const initial = createInitialState(DEMO_V1_CONTENT)
     if (!initial.ok) throw new Error('command_invalid')
     this.roomId = generateRoomId()
+    this.roomSecret = randomUrlSafe(6) // ADR-007：8 字符 base64url 房间口令，约 48-bit
     this.campaignId = generateCampaignId()
     this.seed = randomUrlSafe(16)
     this.game = initial.state
@@ -62,9 +64,9 @@ export class HostSessionController {
     this.hostCommandCounter = 0
     const hostToken = generateSessionToken()
     this.bindings.set(this.options.hostClientId, { clientId: this.options.hostClientId, role: 'host', seat: 'host', tokenFingerprint: sessionTokenFingerprint(hostToken), connectionId: 'host' })
-    this.options.hostTransport.open(this.roomId)
+    this.options.hostTransport.open(this.roomId, this.roomSecret)
     this.changed()
-    return { roomId: this.roomId, campaignId: this.campaignId }
+    return { roomId: this.roomId, campaignId: this.campaignId, secret: this.roomSecret }
   }
 
   public hostSubmit(command: 'start-demo' | 'advance'): CommandResult {
@@ -92,6 +94,7 @@ export class HostSessionController {
     return {
       status: this.status,
       roomId: this.roomId,
+      secret: this.roomSecret,
       campaignId: this.campaignId,
       seed: this.seed,
       hasPlayer: [...this.bindings.values()].some((binding) => binding.role === 'player'),
