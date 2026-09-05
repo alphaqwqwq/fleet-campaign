@@ -1,5 +1,11 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "outputDirectory": "apps/web/dist"
+  "outputDirectory": "apps/web/dist",
+  "crons": [
+    {
+      "path": "/api/heartbeat",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

@@ -1,3 +1,15 @@
+---
+tags: []
+aliases: []
+category: unassigned
+---
+
+---
+tags: []
+aliases: []
+category: unassigned
+---
+
 # 网页发布 CI/CD 经验手册
 
 - 状态：现行（2026-08-13 从归档恢复，仅保留实测事实）
@@ -73,6 +85,7 @@ PR 与 `main` 推送由 GitHub Actions 执行同一套门禁；本地先跑通�
 6. **房间码**：5 位数字（10000–99999），中继按码建房间；房主 `host-open` 会做占据检查（409 `room_occupied`）并清空旧日志，`host-close`/1h TTL 释放码。撞码概率可忽略；真撞了房主显示传输不可用，关闭重建即可。
 7. **备选传输**：`?transport=peerjs` 可回退 PeerJS 直连（依赖外部信令，国内不可靠，仅调试用）。
 8. **轮询防并发（已固化）**：慢网络下一次 poll 可能超过轮询间隔，导致多个 tick 并发读取同一游标、同一帧重复投递十几次（表现为"一次操作被反复播报"）。`packages/realtime/src/relay.ts` 的 `startPollLoop` 用 `inFlight` 守卫保证一次只跑一个 poll、游标单调前进、每帧恰好投递一次。**修改轮询逻辑必须保留该守卫，并跑 `relay.test.ts` 的"慢网络恰好一次"回归测试。**
+9. **Redis 保活（Cron）**：Vercel 官方 Redis 免费档会因"无近期活动"删除数据库（fleet-relay）。relay 只在有人开房/联机时写 Redis，平时无写入有被删风险。`vercel.json` 的 `crons` 每天 06:00 调 `/api/heartbeat`：用专用房间码 `90999`（`HEARTBEAT_ROOM_ID` 可覆盖）写 `host-open` → 写 `fc:heartbeat:last` 标记（90 天 TTL）→ `host-close`，保证数据库有真实命令活动。`CRON_SECRET` 设置后，Vercel cron 请求自动带 `Authorization: Bearer`，心跳函数校验（未设则不校验，仅限无害写）。验证：`https://fleet.alphaqwq.xyz/api/heartbeat`（需带 CRON_SECRET 头或未设时直接访问）返回 `{"ok":true,...}`；Redis 里应有 `fc:heartbeat:last` 键。
 
 ## 回滚与止损
 
